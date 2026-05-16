@@ -1,5 +1,4 @@
 #![no_std]
-
 use soroban_sdk::{contract, contractimpl, contracttype, token, Address, Env, Symbol};
 
 #[contracttype]
@@ -51,12 +50,11 @@ impl EscrowContract {
         release_time: u64,
     ) -> u64 {
         depositor.require_auth();
+        assert!(amount > 0, "Amount must be greater than zero");
 
-        // Transfer tokens from depositor to contract
         let token_client = token::Client::new(&env, &token);
         token_client.transfer(&depositor, &env.current_contract_address(), &amount);
 
-        // Get and increment escrow count
         let count: u64 = env
             .storage()
             .instance()
@@ -64,7 +62,6 @@ impl EscrowContract {
             .unwrap_or(0);
         let escrow_id = count + 1;
 
-        // Store the escrow
         let escrow = Escrow {
             depositor,
             beneficiary,
@@ -75,7 +72,7 @@ impl EscrowContract {
         };
 
         env.storage()
-            .instance()
+            .persistent()
             .set(&DataKey::Escrow(escrow_id), &escrow);
         env.storage()
             .instance()
@@ -91,15 +88,17 @@ impl EscrowContract {
     pub fn release(env: Env, escrow_id: u64) {
         let mut escrow: Escrow = env
             .storage()
-            .instance()
+            .persistent()
             .get(&DataKey::Escrow(escrow_id))
             .expect("Escrow not found");
 
         escrow.depositor.require_auth();
+        assert!(escrow.status == EscrowStatus::Active, "Escrow is not active");
 
+        let current_time = env.ledger().timestamp();
         assert!(
-            escrow.status == EscrowStatus::Active,
-            "Escrow is not active"
+            current_time >= escrow.release_time,
+            "Release time has not been reached"
         );
 
         let token_client = token::Client::new(&env, &escrow.token);
@@ -111,22 +110,21 @@ impl EscrowContract {
 
         escrow.status = EscrowStatus::Released;
         env.storage()
-            .instance()
+            .persistent()
             .set(&DataKey::Escrow(escrow_id), &escrow);
 
         env.events()
             .publish((Symbol::new(&env, "escrow_released"),), (escrow_id,));
     }
 
-    /// Refund to depositor
+    /// Refund to depositor — admin only, works on Active or Disputed escrows
     pub fn refund(env: Env, escrow_id: u64) {
         let mut escrow: Escrow = env
             .storage()
-            .instance()
+            .persistent()
             .get(&DataKey::Escrow(escrow_id))
             .expect("Escrow not found");
 
-        // Only admin can refund
         let admin: Address = env
             .storage()
             .instance()
@@ -135,8 +133,9 @@ impl EscrowContract {
         admin.require_auth();
 
         assert!(
-            escrow.status == EscrowStatus::Active,
-            "Escrow is not active"
+            escrow.status == EscrowStatus::Active
+                || escrow.status == EscrowStatus::Disputed,
+            "Escrow cannot be refunded in current status"
         );
 
         let token_client = token::Client::new(&env, &escrow.token);
@@ -148,7 +147,7 @@ impl EscrowContract {
 
         escrow.status = EscrowStatus::Refunded;
         env.storage()
-            .instance()
+            .persistent()
             .set(&DataKey::Escrow(escrow_id), &escrow);
 
         env.events()
@@ -158,7 +157,7 @@ impl EscrowContract {
     /// Get escrow details
     pub fn get_escrow(env: Env, escrow_id: u64) -> Escrow {
         env.storage()
-            .instance()
+            .persistent()
             .get(&DataKey::Escrow(escrow_id))
             .expect("Escrow not found")
     }
@@ -171,27 +170,138 @@ impl EscrowContract {
             .unwrap_or(0)
     }
 
-    /// Dispute an escrow
+    /// Raise a dispute — beneficiary only
     pub fn dispute(env: Env, escrow_id: u64) {
         let mut escrow: Escrow = env
             .storage()
-            .instance()
+            .persistent()
             .get(&DataKey::Escrow(escrow_id))
             .expect("Escrow not found");
 
         escrow.beneficiary.require_auth();
-
-        assert!(
-            escrow.status == EscrowStatus::Active,
-            "Escrow is not active"
-        );
+        assert!(escrow.status == EscrowStatus::Active, "Escrow is not active");
 
         escrow.status = EscrowStatus::Disputed;
         env.storage()
-            .instance()
+            .persistent()
             .set(&DataKey::Escrow(escrow_id), &escrow);
 
         env.events()
             .publish((Symbol::new(&env, "escrow_disputed"),), (escrow_id,));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use soroban_sdk::{
+        testutils::{Address as _, Ledger},
+        token::{Client as TokenClient, StellarAssetClient},
+        Address, Env,
+    };
+
+    fn create_token(env: &Env, admin: &Address) -> Address {
+        let token_contract = env.register_stellar_asset_contract_v2(admin.clone());
+        token_contract.address()
+    }
+
+    #[test]
+    fn test_create_escrow() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let admin = Address::generate(&env);
+        let depositor = Address::generate(&env);
+        let beneficiary = Address::generate(&env);
+        let token = create_token(&env, &admin);
+        StellarAssetClient::new(&env, &token).mint(&depositor, &1000);
+
+        let contract_id = env.register(EscrowContract, ());
+        let client = EscrowContractClient::new(&env, &contract_id);
+        client.initialize(&admin);
+
+        let escrow_id = client.create_escrow(&depositor, &beneficiary, &token, &100, &0u64);
+        assert_eq!(escrow_id, 1);
+        assert_eq!(client.get_escrow(&escrow_id).status, EscrowStatus::Active);
+        assert_eq!(client.get_count(), 1);
+    }
+
+    #[test]
+    fn test_release() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let admin = Address::generate(&env);
+        let depositor = Address::generate(&env);
+        let beneficiary = Address::generate(&env);
+        let token = create_token(&env, &admin);
+        StellarAssetClient::new(&env, &token).mint(&depositor, &1000);
+
+        let contract_id = env.register(EscrowContract, ());
+        let client = EscrowContractClient::new(&env, &contract_id);
+        client.initialize(&admin);
+
+        let escrow_id = client.create_escrow(&depositor, &beneficiary, &token, &100, &0u64);
+        client.release(&escrow_id);
+        assert_eq!(client.get_escrow(&escrow_id).status, EscrowStatus::Released);
+    }
+
+    #[test]
+    fn test_dispute_then_refund() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let admin = Address::generate(&env);
+        let depositor = Address::generate(&env);
+        let beneficiary = Address::generate(&env);
+        let token = create_token(&env, &admin);
+        StellarAssetClient::new(&env, &token).mint(&depositor, &1000);
+
+        let contract_id = env.register(EscrowContract, ());
+        let client = EscrowContractClient::new(&env, &contract_id);
+        client.initialize(&admin);
+
+        let escrow_id = client.create_escrow(&depositor, &beneficiary, &token, &100, &0u64);
+        client.dispute(&escrow_id);
+        assert_eq!(client.get_escrow(&escrow_id).status, EscrowStatus::Disputed);
+
+        client.refund(&escrow_id);
+        assert_eq!(client.get_escrow(&escrow_id).status, EscrowStatus::Refunded);
+    }
+
+    #[test]
+    #[should_panic(expected = "Amount must be greater than zero")]
+    fn test_zero_amount_rejected() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let admin = Address::generate(&env);
+        let depositor = Address::generate(&env);
+        let beneficiary = Address::generate(&env);
+        let token = create_token(&env, &admin);
+
+        let contract_id = env.register(EscrowContract, ());
+        let client = EscrowContractClient::new(&env, &contract_id);
+        client.initialize(&admin);
+
+        client.create_escrow(&depositor, &beneficiary, &token, &0, &0u64);
+    }
+
+    #[test]
+    fn test_release_time_enforced() {
+        let env = Env::default();
+        env.mock_all_auths();
+        env.ledger().set_timestamp(500);
+
+        let admin = Address::generate(&env);
+        let depositor = Address::generate(&env);
+        let beneficiary = Address::generate(&env);
+        let token = create_token(&env, &admin);
+        StellarAssetClient::new(&env, &token).mint(&depositor, &1000);
+
+        let contract_id = env.register(EscrowContract, ());
+        let client = EscrowContractClient::new(&env, &contract_id);
+        client.initialize(&admin);
+
+        // release_time is 1000, current time is 500 — should fail
+        let escrow_id = client.create_escrow(&depositor, &beneficiary, &token, &100, &1000u64);
+        let result = client.try_release(&escrow_id);
+        assert!(result.is_err());
     }
 }
