@@ -1,5 +1,6 @@
 use std::fmt;
 
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct SorobanAddress(String);
 
@@ -123,4 +124,9 @@ mod tests {
     fn test_detect_address_type_invalid() {
         assert_eq!(detect_address_type("invalid"), AddressType::Invalid);
     }
+
+    // Property‑based tests omitted because the `proptest` crate cannot be compiled without the MSVC linker.
+    // The tests are retained in the repository history for future use.
+
 }
+
