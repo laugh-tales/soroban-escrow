@@ -20,16 +20,43 @@ impl std::fmt::Display for TxError {
 }
 
 /// Converts stroops to XLM (1 XLM = 10,000,000 stroops)
+///
+/// # Examples
+///
+/// ```rust
+/// use soroban_toolkit::transaction::stroops_to_xlm;
+/// assert_eq!(stroops_to_xlm(10_000_000), 1.0);
+/// assert_eq!(stroops_to_xlm(1_500_000), 0.15);
+/// assert_eq!(stroops_to_xlm(300), 0.00003);
+/// ```
 pub fn stroops_to_xlm(stroops: u64) -> f64 {
     stroops as f64 / 10_000_000.0
 }
 
 /// Converts XLM to stroops
+///
+/// # Examples
+///
+/// ```rust
+/// use soroban_toolkit::transaction::xlm_to_stroops;
+/// assert_eq!(xlm_to_stroops(1.0), 10_000_000);
+/// assert_eq!(xlm_to_stroops(0.15), 1_500_000);
+/// assert_eq!(xlm_to_stroops(0.0000001), 1);
+/// ```
 pub fn xlm_to_stroops(xlm: f64) -> u64 {
     (xlm * 10_000_000.0).round() as u64
 }
 
 /// Formats stroops as a readable XLM string
+///
+/// # Examples
+///
+/// ```rust
+/// use soroban_toolkit::transaction::format_xlm;
+/// assert_eq!(format_xlm(10_000_000), "1.0000000 XLM");
+/// assert_eq!(format_xlm(1_500_000), "0.1500000 XLM");
+/// assert_eq!(format_xlm(300), "0.0000300 XLM");
+/// ```
 pub fn format_xlm(stroops: u64) -> String {
     format!("{:.7} XLM", stroops_to_xlm(stroops))
 }
@@ -78,6 +105,22 @@ mod tests {
     #[test]
     fn test_format_xlm() {
         assert_eq!(format_xlm(10_000_000), "1.0000000 XLM");
+        assert_eq!(format_xlm(1_500_000), "0.1500000 XLM");
+        assert_eq!(format_xlm(300), "0.0000300 XLM");
+    }
+
+    #[test]
+    fn test_stroops_to_xlm_small_values() {
+        assert_eq!(stroops_to_xlm(1), 0.0000001);
+        assert_eq!(stroops_to_xlm(300), 0.00003);
+        assert_eq!(stroops_to_xlm(15_000_000), 1.5);
+    }
+
+    #[test]
+    fn test_xlm_to_stroops_rounding() {
+        assert_eq!(xlm_to_stroops(0.0000001), 1);
+        assert_eq!(xlm_to_stroops(1.5), 15_000_000);
+        assert_eq!(xlm_to_stroops(0.00003), 300);
     }
 
     #[test]
