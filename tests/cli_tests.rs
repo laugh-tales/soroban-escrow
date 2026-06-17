@@ -63,7 +63,7 @@ fn test_cli_address_mask_invalid() {
 #[test]
 fn test_cli_address_detect_account() {
     let output = Command::new(get_bin_path())
-        .args(["address", "detect", VALID_ACCOUNT])
+        .args(["address", "detect-type", VALID_ACCOUNT])
         .output()
         .expect("failed to execute process");
 
@@ -75,7 +75,7 @@ fn test_cli_address_detect_account() {
 #[test]
 fn test_cli_address_detect_contract() {
     let output = Command::new(get_bin_path())
-        .args(["address", "detect", VALID_CONTRACT])
+        .args(["address", "detect-type", VALID_CONTRACT])
         .output()
         .expect("failed to execute process");
 
@@ -87,12 +87,11 @@ fn test_cli_address_detect_contract() {
 #[test]
 fn test_cli_address_detect_invalid() {
     let output = Command::new(get_bin_path())
-        .args(["address", "detect", INVALID_ADDRESS])
+        .args(["address", "detect-type", INVALID_ADDRESS])
         .output()
         .expect("failed to execute process");
 
-    assert!(!output.status.success());
-    assert_eq!(output.status.code(), Some(1));
-    let stderr = String::from_utf8(output.stderr).unwrap();
-    assert!(stderr.contains("Error: Address is invalid"));
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert_eq!(stdout.trim(), "Invalid");
 }
