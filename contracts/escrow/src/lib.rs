@@ -53,7 +53,7 @@ impl EscrowContract {
         assert!(amount > 0, "Amount must be greater than zero");
 
         let token_client = token::Client::new(&env, &token);
-        token_client.transfer(&depositor, &env.current_contract_address(), &amount);
+        token_client.transfer(&depositor, env.current_contract_address(), &amount);
 
         let count: u64 = env
             .storage()
@@ -78,6 +78,7 @@ impl EscrowContract {
             .instance()
             .set(&DataKey::EscrowCount, &escrow_id);
 
+        #[allow(deprecated)]
         env.events()
             .publish((Symbol::new(&env, "escrow_created"),), (escrow_id,));
 
@@ -116,6 +117,7 @@ impl EscrowContract {
             .persistent()
             .set(&DataKey::Escrow(escrow_id), &escrow);
 
+        #[allow(deprecated)]
         env.events()
             .publish((Symbol::new(&env, "escrow_released"),), (escrow_id,));
     }
@@ -152,6 +154,7 @@ impl EscrowContract {
             .persistent()
             .set(&DataKey::Escrow(escrow_id), &escrow);
 
+        #[allow(deprecated)]
         env.events()
             .publish((Symbol::new(&env, "escrow_refunded"),), (escrow_id,));
     }
@@ -191,6 +194,7 @@ impl EscrowContract {
             .persistent()
             .set(&DataKey::Escrow(escrow_id), &escrow);
 
+        #[allow(deprecated)]
         env.events()
             .publish((Symbol::new(&env, "escrow_disputed"),), (escrow_id,));
     }
