@@ -63,8 +63,9 @@ pub fn from_base64(s: &str) -> Result<Vec<u8>, EncodingError> {
 /// Basic usage:
 ///
 /// ```rust
+/// use soroban_toolkit::encoding::to_base64_url;
 /// let data = b"hello world";
-/// let encoded = soroban_toolkit::encoding::to_base64_url(data);
+/// let encoded = to_base64_url(data);
 /// assert!(!encoded.contains('+'));
 /// assert!(!encoded.contains('/'));
 /// assert!(!encoded.contains('='));
@@ -73,8 +74,9 @@ pub fn from_base64(s: &str) -> Result<Vec<u8>, EncodingError> {
 /// URL context usage:
 ///
 /// ```rust
+/// use soroban_toolkit::encoding::to_base64_url;
 /// let data = b"sensitive-data";
-/// let encoded = soroban_toolkit::encoding::to_base64_url(data);
+/// let encoded = to_base64_url(data);
 /// let url = format!("https://example.com/data/{}", encoded);
 /// // URL is safe without percent-encoding the base64 characters
 /// ```
