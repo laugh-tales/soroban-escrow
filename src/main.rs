@@ -236,9 +236,6 @@ fn main() {
                 };
                 if json {
                     println!("{}", ok_json(serde_json::json!(kind)));
-                } else if kind == "Invalid" {
-                    eprintln!("Error: Address is invalid");
-                    process::exit(1);
                 } else {
                     println!("{kind}");
                 }
