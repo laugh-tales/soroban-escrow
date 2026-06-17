@@ -60,11 +60,34 @@ pub fn is_account_address(address: &str) -> bool {
 }
 
 /// Masks an address showing only first 4 and last 4 characters
+/// 
+/// # Examples
+/// ```
+/// let addr = "GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGZN36UWBE5XFGT35JA5UMG";
+/// assert_eq!(mask_address(addr), "GCEZ...5UMG");
+/// ```
 pub fn mask_address(address: &str) -> String {
     if address.len() < 8 {
         return address.to_string();
     }
     format!("{}...{}", &address[..4], &address[address.len() - 4..])
+}
+
+/// Masks the middle of an address, leaving `visible` characters at the start and end visible.
+/// If the address is too short to mask, it is returned unchanged.
+///
+/// # Examples
+/// ```
+/// let addr = "GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGZN36UWBE5XFGT35JA5UMG";
+/// assert_eq!(mask_middle(addr, 6), "GCEZWK...JA5UMG");
+/// ```
+pub fn mask_middle(address: &str, visible: usize) -> String {
+    if address.len() <= visible * 2 {
+        return address.to_string();
+    }
+    let start = &address[..visible];
+    let end = &address[address.len() - visible..];
+    format!("{}...{}", start, end)
 }
 
 /// Detects whether a string is a Stellar account address, contract address, or invalid.
@@ -195,6 +218,11 @@ mod tests {
     #[test]
     fn test_mask_address() {
         assert_eq!(mask_address(VALID_ACCOUNT), "GCEZ...5UMG");
+    }
+
+    #[test]
+    fn test_mask_middle() {
+        assert_eq!(mask_middle(VALID_ACCOUNT, 6), "GCEZWK...JA5UMG");
     }
 
     #[test]
