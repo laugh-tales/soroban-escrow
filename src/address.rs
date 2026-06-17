@@ -76,6 +76,81 @@ pub fn detect_address_type(address: &str) -> AddressType {
     }
 }
 
+/// The result of comparing two lists of Stellar addresses.
+///
+/// # Example
+///
+/// ```
+/// use soroban_toolkit::address::diff_addresses;
+///
+/// let old = &["GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGZN36UWBE5XFGT35JA5UMG"];
+/// let new = &[
+///     "GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGZN36UWBE5XFGT35JA5UMG",
+///     "GBXGQJWRYGHM5VLDNRLN3RPRJMRZOX3Z6G5CHCGZN36UWBE5XFGT35JB",
+/// ];
+/// let diff = diff_addresses(old, new);
+/// assert_eq!(diff.common, vec!["GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGZN36UWBE5XFGT35JA5UMG"]);
+/// assert_eq!(diff.added,  vec!["GBXGQJWRYGHM5VLDNRLN3RPRJMRZOX3Z6G5CHCGZN36UWBE5XFGT35JB"]);
+/// assert!(diff.removed.is_empty());
+/// ```
+#[derive(Debug, Clone, PartialEq)]
+pub struct AddressDiff {
+    /// Addresses present in `new` but not in `old`.
+    pub added: Vec<String>,
+    /// Addresses present in `old` but not in `new`.
+    pub removed: Vec<String>,
+    /// Addresses present in both `old` and `new`.
+    pub common: Vec<String>,
+}
+
+/// Compares two lists of Stellar addresses and returns the diff.
+///
+/// The order of entries in each field follows the order they first appear
+/// in the respective input slice.
+///
+/// # Example
+///
+/// ```
+/// use soroban_toolkit::address::diff_addresses;
+///
+/// let old = &[
+///     "GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGZN36UWBE5XFGT35JA5UMG",
+///     "GBXGQJWRYGHM5VLDNRLN3RPRJMRZOX3Z6G5CHCGZN36UWBE5XFGT35JB",
+/// ];
+/// let new = &["GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGZN36UWBE5XFGT35JA5UMG"];
+/// let diff = diff_addresses(old, new);
+/// assert_eq!(diff.common,  vec!["GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGZN36UWBE5XFGT35JA5UMG"]);
+/// assert_eq!(diff.removed, vec!["GBXGQJWRYGHM5VLDNRLN3RPRJMRZOX3Z6G5CHCGZN36UWBE5XFGT35JB"]);
+/// assert!(diff.added.is_empty());
+/// ```
+pub fn diff_addresses(old: &[&str], new: &[&str]) -> AddressDiff {
+    use std::collections::HashSet;
+
+    let old_set: HashSet<&str> = old.iter().copied().collect();
+    let new_set: HashSet<&str> = new.iter().copied().collect();
+
+    AddressDiff {
+        added: new
+            .iter()
+            .copied()
+            .filter(|a| !old_set.contains(a))
+            .map(String::from)
+            .collect(),
+        removed: old
+            .iter()
+            .copied()
+            .filter(|a| !new_set.contains(a))
+            .map(String::from)
+            .collect(),
+        common: old
+            .iter()
+            .copied()
+            .filter(|a| new_set.contains(a))
+            .map(String::from)
+            .collect(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

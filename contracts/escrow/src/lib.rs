@@ -79,6 +79,7 @@ impl EscrowContract {
             .instance()
             .set(&DataKey::EscrowCount, &escrow_id);
 
+        #[allow(deprecated)]
         env.events()
             .publish((Symbol::new(&env, "escrow_created"),), (escrow_id,));
 
@@ -118,6 +119,7 @@ impl EscrowContract {
             .persistent()
             .set(&DataKey::Escrow(escrow_id), &escrow);
 
+        #[allow(deprecated)]
         env.events()
             .publish((Symbol::new(&env, "escrow_released"),), (escrow_id,));
     }
@@ -155,6 +157,7 @@ impl EscrowContract {
             .persistent()
             .set(&DataKey::Escrow(escrow_id), &escrow);
 
+        #[allow(deprecated)]
         env.events()
             .publish((Symbol::new(&env, "escrow_refunded"),), (escrow_id,));
     }
@@ -195,6 +198,7 @@ impl EscrowContract {
             .persistent()
             .set(&DataKey::Escrow(escrow_id), &escrow);
 
+        #[allow(deprecated)]
         env.events()
             .publish((Symbol::new(&env, "escrow_disputed"),), (escrow_id,));
     }

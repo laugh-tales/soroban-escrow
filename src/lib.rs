@@ -6,4 +6,5 @@ pub mod hash;
 pub mod memo;
 pub mod transaction;
 
+pub use address::AddressDiff;
 pub use address::SorobanAddress;
