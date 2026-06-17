@@ -13,10 +13,83 @@ impl std::fmt::Display for TxError {
             TxError::InvalidHash => write!(f, "Invalid transaction hash"),
             TxError::InvalidFee => write!(f, "Invalid fee"),
             TxError::InvalidSequence => write!(f, "Invalid sequence number"),
-            TxError::InvalidTimeBounds => write!(f, "Invalid time bounds"),
+            TxError::InvalidTimeBounds => write!(f, "Invalid time bounds: max_time must be 0 or greater than min_time"),
             TxError::InvalidAssetCode => write!(f, "Invalid asset code"),
         }
     }
+}
+
+/// Represents the time bounds for a Stellar transaction.
+///
+/// `min_time` and `max_time` are Unix timestamps in seconds.
+/// A value of `0` for `max_time` means the transaction has no expiry.
+/// A value of `0` for `min_time` means the transaction is valid from the start of time.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TimeBounds {
+    /// Earliest time (Unix seconds) at which the transaction is valid (0 = no lower bound)
+    pub min_time: u64,
+    /// Latest time (Unix seconds) at which the transaction is valid (0 = no upper bound)
+    pub max_time: u64,
+}
+
+/// Validates Stellar transaction time bounds.
+///
+/// Returns `Ok(())` if the bounds are valid. Returns `Err(TxError::InvalidTimeBounds)`
+/// when `max_time` is non-zero and not strictly greater than `min_time`.
+///
+/// # Examples
+///
+/// ```rust
+/// use soroban_toolkit::transaction::{TimeBounds, validate_time_bounds};
+///
+/// let valid = TimeBounds { min_time: 1_000, max_time: 2_000 };
+/// assert!(validate_time_bounds(&valid).is_ok());
+///
+/// let no_expiry = TimeBounds { min_time: 1_000, max_time: 0 };
+/// assert!(validate_time_bounds(&no_expiry).is_ok());
+///
+/// let invalid = TimeBounds { min_time: 2_000, max_time: 1_000 };
+/// assert!(validate_time_bounds(&invalid).is_err());
+/// ```
+pub fn validate_time_bounds(bounds: &TimeBounds) -> Result<(), TxError> {
+    if bounds.max_time != 0 && bounds.max_time <= bounds.min_time {
+        return Err(TxError::InvalidTimeBounds);
+    }
+    Ok(())
+}
+
+/// Returns `true` if `current_time` falls within the given time bounds.
+///
+/// - Returns `false` when `current_time < min_time`.
+/// - Returns `false` when `max_time` is non-zero and `current_time > max_time`.
+/// - A `max_time` of `0` means no upper bound (never expires).
+///
+/// # Examples
+///
+/// ```rust
+/// use soroban_toolkit::transaction::{TimeBounds, is_within_bounds};
+///
+/// let bounds = TimeBounds { min_time: 1_000, max_time: 2_000 };
+/// assert!(is_within_bounds(&bounds, 1_500));
+/// assert!(!is_within_bounds(&bounds, 500));
+/// assert!(!is_within_bounds(&bounds, 2_500));
+///
+/// // Boundary values are inclusive
+/// assert!(is_within_bounds(&bounds, 1_000));
+/// assert!(is_within_bounds(&bounds, 2_000));
+///
+/// // max_time == 0 means no expiry
+/// let open = TimeBounds { min_time: 1_000, max_time: 0 };
+/// assert!(is_within_bounds(&open, 99_999_999));
+/// ```
+pub fn is_within_bounds(bounds: &TimeBounds, current_time: u64) -> bool {
+    if current_time < bounds.min_time {
+        return false;
+    }
+    if bounds.max_time != 0 && current_time > bounds.max_time {
+        return false;
+    }
+    true
 }
 
 /// Converts stroops to XLM (1 XLM = 10,000,000 stroops)
@@ -133,5 +206,87 @@ mod tests {
     #[test]
     fn test_estimate_fee() {
         assert_eq!(estimate_fee(100, 3), 300);
+    }
+
+    #[test]
+    fn test_validate_time_bounds_valid() {
+        let bounds = TimeBounds { min_time: 1_000, max_time: 2_000 };
+        assert!(validate_time_bounds(&bounds).is_ok());
+    }
+
+    #[test]
+    fn test_validate_time_bounds_max_less_than_min() {
+        let bounds = TimeBounds { min_time: 2_000, max_time: 1_000 };
+        assert!(validate_time_bounds(&bounds).is_err());
+    }
+
+    #[test]
+    fn test_validate_time_bounds_max_equal_to_min() {
+        let bounds = TimeBounds { min_time: 1_000, max_time: 1_000 };
+        assert!(validate_time_bounds(&bounds).is_err());
+    }
+
+    #[test]
+    fn test_validate_time_bounds_zero_max_time() {
+        // max_time == 0 means no expiry — always valid regardless of min_time
+        let bounds = TimeBounds { min_time: 1_000, max_time: 0 };
+        assert!(validate_time_bounds(&bounds).is_ok());
+    }
+
+    #[test]
+    fn test_validate_time_bounds_both_zero() {
+        let bounds = TimeBounds { min_time: 0, max_time: 0 };
+        assert!(validate_time_bounds(&bounds).is_ok());
+    }
+
+    #[test]
+    fn test_is_within_bounds_inside_range() {
+        let bounds = TimeBounds { min_time: 1_000, max_time: 2_000 };
+        assert!(is_within_bounds(&bounds, 1_500));
+    }
+
+    #[test]
+    fn test_is_within_bounds_before_min() {
+        let bounds = TimeBounds { min_time: 1_000, max_time: 2_000 };
+        assert!(!is_within_bounds(&bounds, 500));
+    }
+
+    #[test]
+    fn test_is_within_bounds_after_max() {
+        let bounds = TimeBounds { min_time: 1_000, max_time: 2_000 };
+        assert!(!is_within_bounds(&bounds, 2_500));
+    }
+
+    #[test]
+    fn test_is_within_bounds_at_min_boundary() {
+        let bounds = TimeBounds { min_time: 1_000, max_time: 2_000 };
+        assert!(is_within_bounds(&bounds, 1_000));
+    }
+
+    #[test]
+    fn test_is_within_bounds_at_max_boundary() {
+        let bounds = TimeBounds { min_time: 1_000, max_time: 2_000 };
+        assert!(is_within_bounds(&bounds, 2_000));
+    }
+
+    #[test]
+    fn test_is_within_bounds_no_expiry() {
+        let bounds = TimeBounds { min_time: 1_000, max_time: 0 };
+        assert!(is_within_bounds(&bounds, 99_999_999));
+    }
+
+    #[test]
+    fn test_is_within_bounds_zero_min_time() {
+        let bounds = TimeBounds { min_time: 0, max_time: 2_000 };
+        assert!(is_within_bounds(&bounds, 0));
+        assert!(is_within_bounds(&bounds, 1_000));
+        assert!(!is_within_bounds(&bounds, 2_001));
+    }
+
+    #[test]
+    fn test_time_bounds_error_message() {
+        let bounds = TimeBounds { min_time: 5_000, max_time: 1_000 };
+        let err = validate_time_bounds(&bounds).unwrap_err();
+        assert!(err.to_string().contains("max_time"));
     }
 }
