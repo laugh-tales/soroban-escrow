@@ -67,7 +67,20 @@ pub fn mask_address(address: &str) -> String {
     format!("{}...{}", &address[..4], &address[address.len() - 4..])
 }
 
-/// Detects the type of a Stellar address
+/// Detects whether a string is a Stellar account address, contract address, or invalid.
+///
+/// # Examples
+///
+/// ```
+/// use soroban_toolkit::address::{detect_address_type, AddressType};
+///
+/// let account = "GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGZN36UWBE5XFGT35JA5UMG";
+/// let contract = "CCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGZN36UWBE5XFGT35JA5UMG";
+///
+/// assert_eq!(detect_address_type(account), AddressType::Account);
+/// assert_eq!(detect_address_type(contract), AddressType::Contract);
+/// assert_eq!(detect_address_type("not-an-address"), AddressType::Invalid);
+/// ```
 pub fn detect_address_type(address: &str) -> AddressType {
     match validate_address(address) {
         Ok(_) if is_contract_address(address) => AddressType::Contract,
