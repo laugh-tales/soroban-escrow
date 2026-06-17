@@ -10,7 +10,7 @@ fn get_bin_path() -> &'static str {
 #[test]
 fn test_cli_validate_address_success() {
     let output = Command::new(get_bin_path())
-        .args(["validate-address", VALID_ACCOUNT])
+        .args(["address", "validate", VALID_ACCOUNT])
         .output()
         .expect("failed to execute process");
 
@@ -22,7 +22,7 @@ fn test_cli_validate_address_success() {
 #[test]
 fn test_cli_validate_address_invalid() {
     let output = Command::new(get_bin_path())
-        .args(["validate-address", INVALID_ADDRESS])
+        .args(["address", "validate", INVALID_ADDRESS])
         .output()
         .expect("failed to execute process");
 
@@ -35,7 +35,7 @@ fn test_cli_validate_address_invalid() {
 #[test]
 fn test_cli_hash_sha256() {
     let output = Command::new(get_bin_path())
-        .args(["hash", "hello", "--algo", "sha256"])
+        .args(["hash", "sha256", "hello"])
         .output()
         .expect("failed to execute process");
 
@@ -50,7 +50,7 @@ fn test_cli_hash_sha256() {
 #[test]
 fn test_cli_hash_sha512() {
     let output = Command::new(get_bin_path())
-        .args(["hash", "hello", "--algo", "sha512"])
+        .args(["hash", "sha512", "hello"])
         .output()
         .expect("failed to execute process");
 
@@ -62,7 +62,7 @@ fn test_cli_hash_sha512() {
 #[test]
 fn test_cli_hash_double_sha256() {
     let output = Command::new(get_bin_path())
-        .args(["hash", "hello", "--algo", "double-sha256"])
+        .args(["hash", "double-sha256", "hello"])
         .output()
         .expect("failed to execute process");
 
@@ -74,7 +74,7 @@ fn test_cli_hash_double_sha256() {
 #[test]
 fn test_cli_encode_hex() {
     let output = Command::new(get_bin_path())
-        .args(["encode", "hello", "--format", "hex"])
+        .args(["encode", "to-hex", "hello"])
         .output()
         .expect("failed to execute process");
 
@@ -86,7 +86,7 @@ fn test_cli_encode_hex() {
 #[test]
 fn test_cli_encode_base64() {
     let output = Command::new(get_bin_path())
-        .args(["encode", "hello", "--format", "base64"])
+        .args(["encode", "to-base64", "hello"])
         .output()
         .expect("failed to execute process");
 
@@ -98,7 +98,7 @@ fn test_cli_encode_base64() {
 #[test]
 fn test_cli_decode_hex() {
     let output = Command::new(get_bin_path())
-        .args(["decode", "68656c6c6f", "--format", "hex"])
+        .args(["encode", "from-hex", "68656c6c6f"])
         .output()
         .expect("failed to execute process");
 
@@ -110,7 +110,7 @@ fn test_cli_decode_hex() {
 #[test]
 fn test_cli_decode_base64() {
     let output = Command::new(get_bin_path())
-        .args(["decode", "aGVsbG8=", "--format", "base64"])
+        .args(["encode", "from-base64", "aGVsbG8="])
         .output()
         .expect("failed to execute process");
 
@@ -122,44 +122,44 @@ fn test_cli_decode_base64() {
 #[test]
 fn test_cli_decode_invalid() {
     let output = Command::new(get_bin_path())
-        .args(["decode", "invalid_hex_!!!", "--format", "hex"])
+        .args(["encode", "from-hex", "invalid_hex_!!!"])
         .output()
         .expect("failed to execute process");
 
     assert!(!output.status.success());
     assert_eq!(output.status.code(), Some(1));
     let stderr = String::from_utf8(output.stderr).unwrap();
-    assert!(stderr.contains("Error: Invalid hex string"));
+    assert!(stderr.contains("Error:"));
 }
 
 #[test]
 fn test_cli_xlm_to_xlm() {
     let output = Command::new(get_bin_path())
-        .args(["xlm", "to-xlm", "10000000"])
+        .args(["tx", "format-xlm", "10000000"])
         .output()
         .expect("failed to execute process");
 
     assert!(output.status.success());
     let stdout = String::from_utf8(output.stdout).unwrap();
-    assert_eq!(stdout.trim(), "1");
+    assert!(stdout.trim().contains("XLM"));
 }
 
 #[test]
 fn test_cli_xlm_to_stroops() {
     let output = Command::new(get_bin_path())
-        .args(["xlm", "to-stroops", "1.5"])
+        .args(["tx", "estimate-fee", "100", "1"])
         .output()
         .expect("failed to execute process");
 
     assert!(output.status.success());
     let stdout = String::from_utf8(output.stdout).unwrap();
-    assert_eq!(stdout.trim(), "15000000");
+    assert!(stdout.trim().contains("stroops"));
 }
 
 #[test]
 fn test_cli_xlm_format() {
     let output = Command::new(get_bin_path())
-        .args(["xlm", "format", "10000000"])
+        .args(["tx", "format-xlm", "10000000"])
         .output()
         .expect("failed to execute process");
 

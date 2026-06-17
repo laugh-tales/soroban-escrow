@@ -2,7 +2,7 @@
 
 A trustless escrow smart contract built on the Stellar blockchain using Soroban. Lock funds, set conditions, and release payments — no intermediaries needed.
 
-[![CI](https://github.com/laugh-tales/soroban-toolkit/actions/workflows/ci.yml/badge.svg)](https://github.com/laugh-tales/soroban-toolkit/actions/workflows/ci.yml)
+[![CI](https://github.com/laugh-tales/soroban-escrow/actions/workflows/ci.yml/badge.svg)](https://github.com/laugh-tales/soroban-escrow/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## What It Does
