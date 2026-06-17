@@ -1,4 +1,5 @@
 pub mod address;
+pub mod address_book;
 pub mod asset;
 pub mod encoding;
 pub mod hash;

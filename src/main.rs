@@ -81,37 +81,6 @@ enum AddressCommands {
 
 #[derive(Subcommand)]
 enum HashCommands {
-    Sha256 { input: String },
-    Sha512 { input: String },
-    DoubleSha256 { input: String },
-}
-
-#[derive(Subcommand)]
-enum EncodeCommands {
-    ToHex { input: String },
-    FromHex { input: String },
-    ToBase64 { input: String },
-    FromBase64 { input: String },
-}
-
-#[derive(Subcommand)]
-enum TxCommands {
-    FormatXlm { stroops: u64 },
-    ValidateHash { hash: String },
-    NormalizeHash { hash: String },
-    EstimateFee { base_fee: u32, operations: u32 },
-}
-
-fn ok_json(data: serde_json::Value) -> String {
-    json!({"success": true, "data": data}).to_string()
-}
-
-fn err_json(msg: &str) -> String {
-    json!({"success": false, "error": msg}).to_string()
-}
-
-#[derive(Subcommand)]
-enum HashCommands {
     /// Compute SHA-256 hash
     Sha256 {
         /// Input string to hash
@@ -188,12 +157,12 @@ enum TxCommands {
     },
 }
 
-fn ok_json(data: serde_json::Value) {
-    println!("{}", json!({"success": true, "data": data}));
+fn ok_json(data: serde_json::Value) -> String {
+    json!({"success": true, "data": data}).to_string()
 }
 
-fn err_json(msg: &str) {
-    println!("{}", json!({"success": false, "error": msg}));
+fn err_json(msg: &str) -> String {
+    json!({"success": false, "error": msg}).to_string()
 }
 
 fn main() {
@@ -254,9 +223,6 @@ fn run_address(action: AddressCommands, use_json: bool) {
             };
             if use_json {
                 println!("{}", ok_json(json!(type_str)));
-            } else if addr_type == AddressType::Invalid {
-                eprintln!("Error: Address is invalid");
-                process::exit(1);
             } else {
                 println!("{}", type_str);
             }
