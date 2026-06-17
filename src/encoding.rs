@@ -51,12 +51,81 @@ pub fn from_base64(s: &str) -> Result<Vec<u8>, EncodingError> {
         .map_err(|_| EncodingError::InvalidBase64)
 }
 
-/// Encodes bytes as URL-safe base64
+/// Encodes bytes as URL-safe base64.
+///
+/// This function encodes binary data using the URL-safe base64 alphabet,
+/// which replaces `+` with `-` and `/` with `_`. Padding characters (`=`)
+/// are omitted, making the output suitable for URLs, file names, and other
+/// contexts where standard base64 special characters cause issues.
+///
+/// # Examples
+///
+/// Basic usage:
+///
+/// ```rust
+/// use soroban_toolkit::encoding::to_base64_url;
+/// let data = b"hello world";
+/// let encoded = to_base64_url(data);
+/// assert!(!encoded.contains('+'));
+/// assert!(!encoded.contains('/'));
+/// assert!(!encoded.contains('='));
+/// ```
+///
+/// URL context usage:
+///
+/// ```rust
+/// use soroban_toolkit::encoding::to_base64_url;
+/// let data = b"sensitive-data";
+/// let encoded = to_base64_url(data);
+/// let url = format!("https://example.com/data/{}", encoded);
+/// // URL is safe without percent-encoding the base64 characters
+/// ```
 pub fn to_base64_url(bytes: &[u8]) -> String {
     general_purpose::URL_SAFE_NO_PAD.encode(bytes)
 }
 
-/// Decodes URL-safe base64 to bytes
+/// Decodes URL-safe base64 to bytes.
+///
+/// This function decodes URL-safe base64 strings back to their original binary
+/// representation. It accepts input both with and without padding characters
+/// for flexibility and compatibility with various encoding sources.
+///
+/// # Errors
+///
+/// Returns `EncodingError::InvalidBase64` if the input string contains invalid
+/// base64 characters or is malformed. Valid characters are `A-Z`, `a-z`, `0-9`,
+/// `-`, and `_`. Padding characters (`=`) are optional and accepted.
+///
+/// # Examples
+///
+/// Basic decoding:
+///
+/// ```rust
+/// use soroban_toolkit::encoding::{to_base64_url, from_base64_url};
+/// let original = b"hello world";
+/// let encoded = to_base64_url(original);
+/// let decoded = from_base64_url(&encoded).unwrap();
+/// assert_eq!(decoded, original);
+/// ```
+///
+/// Error handling for invalid input:
+///
+/// ```rust
+/// use soroban_toolkit::encoding::{from_base64_url, EncodingError};
+/// let result = from_base64_url("!!!invalid!!!"); // Invalid characters
+/// assert!(result.is_err());
+/// ```
+///
+/// Compatibility with optional padding:
+///
+/// ```rust
+/// use soroban_toolkit::encoding::from_base64_url;
+/// let unpadded = "aGVsbG8gd29ybGQ"; // No padding
+/// let with_padding = "aGVsbG8gd29ybGQ="; // With padding
+/// // Both decode successfully
+/// assert!(from_base64_url(unpadded).is_ok());
+/// assert!(from_base64_url(with_padding).is_ok());
+/// ```
 pub fn from_base64_url(s: &str) -> Result<Vec<u8>, EncodingError> {
     general_purpose::URL_SAFE_NO_PAD
         .decode(s)
