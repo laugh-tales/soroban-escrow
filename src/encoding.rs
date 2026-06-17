@@ -58,12 +58,51 @@ pub fn pretty_print_json(json: &str) -> Result<String, EncodingError> {
     serde_json::to_string_pretty(&value).map_err(|_| EncodingError::InvalidJson)
 }
 
-/// Splits bytes into fixed-size chunks
+/// Splits a byte slice into fixed-size chunks.
+///
+/// Returns a `Vec` of owned `Vec<u8>` chunks in order. If `chunk_size` is
+/// zero this function returns an empty `Vec` to avoid a panic. If `chunk_size`
+/// is larger than the input, a single chunk containing the whole input is
+/// returned. This is useful for streaming or processing large contract data in
+/// fixed-size pieces.
+///
+/// # Examples
+///
+/// Basic usage:
+///
+/// ```rust
+/// let data = b"helloworld";
+/// let chunks = soroban_toolkit::encoding::chunk_bytes(data, 5);
+/// assert_eq!(chunks, vec![b"hello".to_vec(), b"world".to_vec()]);
+/// ```
+///
+/// Empty input yields no chunks:
+///
+/// ```rust
+/// let chunks = soroban_toolkit::encoding::chunk_bytes(&[], 4);
+/// assert!(chunks.is_empty());
+/// ```
 pub fn chunk_bytes(data: &[u8], chunk_size: usize) -> Vec<Vec<u8>> {
+    if chunk_size == 0 {
+        return Vec::new();
+    }
     data.chunks(chunk_size).map(|c| c.to_vec()).collect()
 }
 
-/// Reassembles chunks back into a single byte vector
+/// Reassembles a sequence of chunks produced by `chunk_bytes` back into a
+/// single contiguous `Vec<u8>`.
+///
+/// Panics are not possible here; an empty slice of chunks returns an empty
+/// vector.
+///
+/// # Examples
+///
+/// ```rust
+/// let data = b"helloworld";
+/// let chunks = soroban_toolkit::encoding::chunk_bytes(data, 5);
+/// let reassembled = soroban_toolkit::encoding::reassemble_chunks(&chunks);
+/// assert_eq!(reassembled, data);
+/// ```
 pub fn reassemble_chunks(chunks: &[Vec<u8>]) -> Vec<u8> {
     chunks.concat()
 }
@@ -102,6 +141,32 @@ mod tests {
         let chunks = chunk_bytes(data, 5);
         let reassembled = reassemble_chunks(&chunks);
         assert_eq!(reassembled, data);
+    }
+
+    #[test]
+    fn test_chunk_empty_input() {
+        let data: &[u8] = &[];
+        let chunks = chunk_bytes(data, 4);
+        assert!(chunks.is_empty());
+        let reassembled = reassemble_chunks(&chunks);
+        assert!(reassembled.is_empty());
+    }
+
+    #[test]
+    fn test_chunk_larger_than_data() {
+        let data = b"abc";
+        let chunks = chunk_bytes(data, 10);
+        assert_eq!(chunks.len(), 1);
+        assert_eq!(chunks[0], data);
+        let reassembled = reassemble_chunks(&chunks);
+        assert_eq!(reassembled, data);
+    }
+
+    #[test]
+    fn test_chunk_zero_size_returns_empty() {
+        let data = b"abcdef";
+        let chunks = chunk_bytes(data, 0);
+        assert!(chunks.is_empty());
     }
 
     #[test]
