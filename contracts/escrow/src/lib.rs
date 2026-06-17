@@ -41,6 +41,7 @@ impl EscrowContract {
     }
 
     /// Create a new escrow
+    #[allow(deprecated)]
     pub fn create_escrow(
         env: Env,
         depositor: Address,
@@ -53,7 +54,7 @@ impl EscrowContract {
         assert!(amount > 0, "Amount must be greater than zero");
 
         let token_client = token::Client::new(&env, &token);
-        token_client.transfer(&depositor, &env.current_contract_address(), &amount);
+        token_client.transfer(&depositor, env.current_contract_address(), &amount);
 
         let count: u64 = env
             .storage()
@@ -85,6 +86,7 @@ impl EscrowContract {
     }
 
     /// Release funds to beneficiary
+    #[allow(deprecated)]
     pub fn release(env: Env, escrow_id: u64) {
         let mut escrow: Escrow = env
             .storage()
@@ -121,6 +123,7 @@ impl EscrowContract {
     }
 
     /// Refund to depositor — admin only, works on Active or Disputed escrows
+    #[allow(deprecated)]
     pub fn refund(env: Env, escrow_id: u64) {
         let mut escrow: Escrow = env
             .storage()
@@ -173,6 +176,7 @@ impl EscrowContract {
     }
 
     /// Raise a dispute — beneficiary only
+    #[allow(deprecated)]
     pub fn dispute(env: Env, escrow_id: u64) {
         let mut escrow: Escrow = env
             .storage()

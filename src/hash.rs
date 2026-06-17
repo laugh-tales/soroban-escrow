@@ -21,6 +21,11 @@ pub fn sha512_hex(data: &[u8]) -> String {
     hex::encode(hasher.finalize())
 }
 
+/// Returns BLAKE3 hash as hex string
+pub fn blake3_hex(data: &[u8]) -> String {
+    hex::encode(blake3::hash(data).as_bytes())
+}
+
 /// Returns double SHA-256 hash as hex string (used in Bitcoin/blockchain)
 pub fn double_sha256(data: &[u8]) -> String {
     let first = sha256_bytes(data);

@@ -295,3 +295,61 @@ fn tx_estimate_fee_text() {
     assert_eq!(code, 0);
     assert!(stdout.contains("XLM"));
 }
+
+// ── hash blake3 & stdin ───────────────────────────────────────────────────────
+
+#[test]
+fn hash_blake3_json() {
+    let (stdout, _stderr, code) = run(&["--json", "hash", "blake3", "hello"]);
+    assert_eq!(code, 0);
+    let v = json_val(&stdout);
+    assert_eq!(v["success"], true);
+    let digest = v["data"].as_str().unwrap();
+    assert_eq!(digest.len(), 64);
+}
+
+#[test]
+fn hash_blake3_text() {
+    let (stdout, _stderr, code) = run(&["hash", "blake3", "hello"]);
+    assert_eq!(code, 0);
+    assert_eq!(stdout.trim().len(), 64);
+}
+
+#[test]
+fn hash_sha256_stdin() {
+    use std::io::Write;
+    use std::process::{Command, Stdio};
+    let bin = env!("CARGO_BIN_EXE_soroban-toolkit");
+    let mut child = Command::new(bin)
+        .args(["hash", "sha256", "-"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("failed to spawn");
+    child.stdin.take().unwrap().write_all(b"hello").unwrap();
+    let out = child.wait_with_output().unwrap();
+    assert_eq!(out.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert_eq!(
+        stdout.trim(),
+        "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+    );
+}
+
+#[test]
+fn hash_blake3_stdin() {
+    use std::io::Write;
+    use std::process::{Command, Stdio};
+    let bin = env!("CARGO_BIN_EXE_soroban-toolkit");
+    let mut child = Command::new(bin)
+        .args(["hash", "blake3", "-"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("failed to spawn");
+    child.stdin.take().unwrap().write_all(b"hello").unwrap();
+    let out = child.wait_with_output().unwrap();
+    assert_eq!(out.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert_eq!(stdout.trim().len(), 64);
+}
