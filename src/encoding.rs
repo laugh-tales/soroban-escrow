@@ -1,20 +1,14 @@
 use base64::{engine::general_purpose, Engine as _};
+use thiserror::Error;
 
-#[derive(Debug)]
+#[derive(Error, Debug, PartialEq, Eq)]
 pub enum EncodingError {
+    #[error("Invalid hex string")]
     InvalidHex,
+    #[error("Invalid base64 string")]
     InvalidBase64,
+    #[error("Invalid JSON string")]
     InvalidJson,
-}
-
-impl std::fmt::Display for EncodingError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            EncodingError::InvalidHex => write!(f, "Invalid hex string"),
-            EncodingError::InvalidBase64 => write!(f, "Invalid base64 string"),
-            EncodingError::InvalidJson => write!(f, "Invalid JSON string"),
-        }
-    }
 }
 
 /// Encodes bytes as hex string
@@ -27,12 +21,30 @@ pub fn from_hex(s: &str) -> Result<Vec<u8>, EncodingError> {
     hex::decode(s).map_err(|_| EncodingError::InvalidHex)
 }
 
-/// Encodes bytes as standard base64
+/// Encodes bytes as standard base64.
+///
+/// # Examples
+///
+/// ```rust
+/// use soroban_toolkit::encoding::to_base64;
+/// let data = b"soroban";
+/// let encoded = to_base64(data);
+/// assert_eq!(encoded, "c29yb2Jhbg==");
+/// ```
 pub fn to_base64(bytes: &[u8]) -> String {
     general_purpose::STANDARD.encode(bytes)
 }
 
-/// Decodes standard base64 to bytes
+/// Decodes standard base64 to bytes.
+///
+/// # Examples
+///
+/// ```rust
+/// use soroban_toolkit::encoding::from_base64;
+/// let encoded = "c29yb2Jhbg==";
+/// let decoded = from_base64(encoded).unwrap();
+/// assert_eq!(decoded, b"soroban");
+/// ```
 pub fn from_base64(s: &str) -> Result<Vec<u8>, EncodingError> {
     general_purpose::STANDARD
         .decode(s)
