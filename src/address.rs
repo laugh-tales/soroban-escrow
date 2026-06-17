@@ -1,6 +1,5 @@
 use std::fmt;
 
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct SorobanAddress(String);
 
@@ -77,6 +76,81 @@ pub fn detect_address_type(address: &str) -> AddressType {
     }
 }
 
+/// The result of comparing two lists of Stellar addresses.
+///
+/// # Example
+///
+/// ```
+/// use soroban_toolkit::address::diff_addresses;
+///
+/// let old = &["GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGZN36UWBE5XFGT35JA5UMG"];
+/// let new = &[
+///     "GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGZN36UWBE5XFGT35JA5UMG",
+///     "GBXGQJWRYGHM5VLDNRLN3RPRJMRZOX3Z6G5CHCGZN36UWBE5XFGT35JB",
+/// ];
+/// let diff = diff_addresses(old, new);
+/// assert_eq!(diff.common, vec!["GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGZN36UWBE5XFGT35JA5UMG"]);
+/// assert_eq!(diff.added,  vec!["GBXGQJWRYGHM5VLDNRLN3RPRJMRZOX3Z6G5CHCGZN36UWBE5XFGT35JB"]);
+/// assert!(diff.removed.is_empty());
+/// ```
+#[derive(Debug, Clone, PartialEq)]
+pub struct AddressDiff {
+    /// Addresses present in `new` but not in `old`.
+    pub added: Vec<String>,
+    /// Addresses present in `old` but not in `new`.
+    pub removed: Vec<String>,
+    /// Addresses present in both `old` and `new`.
+    pub common: Vec<String>,
+}
+
+/// Compares two lists of Stellar addresses and returns the diff.
+///
+/// The order of entries in each field follows the order they first appear
+/// in the respective input slice.
+///
+/// # Example
+///
+/// ```
+/// use soroban_toolkit::address::diff_addresses;
+///
+/// let old = &[
+///     "GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGZN36UWBE5XFGT35JA5UMG",
+///     "GBXGQJWRYGHM5VLDNRLN3RPRJMRZOX3Z6G5CHCGZN36UWBE5XFGT35JB",
+/// ];
+/// let new = &["GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGZN36UWBE5XFGT35JA5UMG"];
+/// let diff = diff_addresses(old, new);
+/// assert_eq!(diff.common,  vec!["GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGZN36UWBE5XFGT35JA5UMG"]);
+/// assert_eq!(diff.removed, vec!["GBXGQJWRYGHM5VLDNRLN3RPRJMRZOX3Z6G5CHCGZN36UWBE5XFGT35JB"]);
+/// assert!(diff.added.is_empty());
+/// ```
+pub fn diff_addresses(old: &[&str], new: &[&str]) -> AddressDiff {
+    use std::collections::HashSet;
+
+    let old_set: HashSet<&str> = old.iter().copied().collect();
+    let new_set: HashSet<&str> = new.iter().copied().collect();
+
+    AddressDiff {
+        added: new
+            .iter()
+            .copied()
+            .filter(|a| !old_set.contains(a))
+            .map(String::from)
+            .collect(),
+        removed: old
+            .iter()
+            .copied()
+            .filter(|a| !new_set.contains(a))
+            .map(String::from)
+            .collect(),
+        common: old
+            .iter()
+            .copied()
+            .filter(|a| new_set.contains(a))
+            .map(String::from)
+            .collect(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -128,5 +202,49 @@ mod tests {
     // Property‑based tests omitted because the `proptest` crate cannot be compiled without the MSVC linker.
     // The tests are retained in the repository history for future use.
 
-}
+    // --- AddressDiff / diff_addresses tests ---
 
+    const ADDR_A: &str = "GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGZN36UWBE5XFGT35JA5UMG";
+    const ADDR_B: &str = "GBXGQJWRYGHM5VLDNRLN3RPRJMRZOX3Z6G5CHCGZN36UWBE5XFGT35JB";
+    const ADDR_C: &str = "GCCCWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGZN36UWBE5XFGT35JA5UMC";
+
+    #[test]
+    fn test_diff_no_change() {
+        let diff = diff_addresses(&[ADDR_A, ADDR_B], &[ADDR_A, ADDR_B]);
+        assert!(diff.added.is_empty());
+        assert!(diff.removed.is_empty());
+        assert_eq!(diff.common, vec![ADDR_A, ADDR_B]);
+    }
+
+    #[test]
+    fn test_diff_all_added() {
+        let diff = diff_addresses(&[], &[ADDR_A, ADDR_B]);
+        assert_eq!(diff.added, vec![ADDR_A, ADDR_B]);
+        assert!(diff.removed.is_empty());
+        assert!(diff.common.is_empty());
+    }
+
+    #[test]
+    fn test_diff_all_removed() {
+        let diff = diff_addresses(&[ADDR_A, ADDR_B], &[]);
+        assert!(diff.added.is_empty());
+        assert_eq!(diff.removed, vec![ADDR_A, ADDR_B]);
+        assert!(diff.common.is_empty());
+    }
+
+    #[test]
+    fn test_diff_mixed() {
+        let diff = diff_addresses(&[ADDR_A, ADDR_B], &[ADDR_B, ADDR_C]);
+        assert_eq!(diff.added, vec![ADDR_C]);
+        assert_eq!(diff.removed, vec![ADDR_A]);
+        assert_eq!(diff.common, vec![ADDR_B]);
+    }
+
+    #[test]
+    fn test_diff_empty_both() {
+        let diff = diff_addresses(&[], &[]);
+        assert!(diff.added.is_empty());
+        assert!(diff.removed.is_empty());
+        assert!(diff.common.is_empty());
+    }
+}
