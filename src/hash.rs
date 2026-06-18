@@ -26,7 +26,16 @@ pub fn blake3_hex(data: &[u8]) -> String {
     hex::encode(blake3::hash(data).as_bytes())
 }
 
-/// Returns double SHA-256 hash as hex string (used in Bitcoin/blockchain)
+/// Returns double SHA-256 hash as hex string (used in blockchain contexts like Bitcoin)
+///
+/// # Examples
+///
+/// ```
+/// use soroban_toolkit::hash::double_sha256;
+///
+/// let result = double_sha256(b"hello");
+/// assert_eq!(result, "9595c9df90075148eb06860365df33584b75bff782a510c6cd4883a419833d50");
+/// ```
 pub fn double_sha256(data: &[u8]) -> String {
     let first = sha256_bytes(data);
     sha256_hex(&first)
@@ -66,6 +75,7 @@ mod tests {
     #[test]
     fn test_double_sha256() {
         let result = double_sha256(b"hello");
+        assert_eq!(result, "9595c9df90075148eb06860365df33584b75bff782a510c6cd4883a419833d50");
         assert_eq!(result.len(), 64);
     }
 
