@@ -1,6 +1,67 @@
 use hmac::{Hmac, Mac};
 use sha2::{Digest, Sha256, Sha512};
 
+/// Computes the Merkle root hash using SHA-256 for a list of leaf data.
+///
+/// # Arguments
+///
+/// * `leaves` - A slice of byte slices representing the leaf nodes
+///
+/// # Examples
+///
+/// ```
+/// use soroban_toolkit::hash::merkle_root;
+///
+/// let leaves = vec![b"leaf1", b"leaf2", b"leaf3"];
+/// let root = merkle_root(&leaves);
+/// assert!(!root.is_empty());
+/// ```
+///
+/// Empty input returns empty string:
+///
+/// ```
+/// use soroban_toolkit::hash::merkle_root;
+///
+/// let empty_leaves: Vec<&[u8]> = vec![];
+/// let root = merkle_root(&empty_leaves);
+/// assert_eq!(root, "");
+/// ```
+pub fn merkle_root(leaves: &[&[u8]]) -> String {
+    if leaves.is_empty() {
+        return String::new();
+    }
+
+    let mut current_level: Vec<Vec<u8>> = leaves
+        .iter()
+        .map(|leaf| sha256_bytes(leaf))
+        .collect();
+
+    while current_level.len() > 1 {
+        let mut next_level = Vec::new();
+        let mut i = 0;
+
+        while i < current_level.len() {
+            let left = &current_level[i];
+            let right = if i + 1 < current_level.len() {
+                &current_level[i + 1]
+            } else {
+                left
+            };
+
+            let mut combined = left.to_vec();
+            combined.extend_from_slice(right);
+            let hashed = sha256_bytes(&combined);
+            next_level.push(hashed);
+
+            i += 2;
+        }
+
+        current_level = next_level;
+    }
+
+    hex::encode(&current_level[0])
+}
+
 type HmacSha256 = Hmac<Sha256>;
 
 /// Returns SHA-256 hash as hex string
@@ -101,6 +162,39 @@ pub fn secure_compare(a: &[u8], b: &[u8]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_merkle_root_empty_input() {
+        let leaves: Vec<&[u8]> = vec![];
+        assert_eq!(merkle_root(&leaves), "");
+    }
+
+    #[test]
+    fn test_merkle_root_single_leaf() {
+        let leaves = vec![b"test"];
+        let expected = sha256_hex(b"test");
+        assert_eq!(merkle_root(&leaves), expected);
+    }
+
+    #[test]
+    fn test_merkle_root_two_leaves() {
+        let leaf1 = b"leaf1";
+        let leaf2 = b"leaf2";
+        let hash1 = sha256_bytes(leaf1);
+        let hash2 = sha256_bytes(leaf2);
+        let mut combined = hash1;
+        combined.extend_from_slice(&hash2);
+        let expected = sha256_hex(&combined);
+        assert_eq!(merkle_root(&[leaf1, leaf2]), expected);
+    }
+
+    #[test]
+    fn test_merkle_root_three_leaves() {
+        let leaves = vec![b"a", b"b", b"c"];
+        let root = merkle_root(&leaves);
+        assert!(!root.is_empty());
+        assert_eq!(root.len(), 64);
+    }
 
     #[test]
     fn test_sha256_known_value() {
