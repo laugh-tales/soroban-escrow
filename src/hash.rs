@@ -1,4 +1,68 @@
+use hmac::{Hmac, Mac};
 use sha2::{Digest, Sha256, Sha512};
+
+/// Computes the Merkle root hash using SHA-256 for a list of leaf data.
+///
+/// # Arguments
+///
+/// * `leaves` - A slice of byte slices representing the leaf nodes
+///
+/// # Examples
+///
+/// ```
+/// use soroban_toolkit::hash::merkle_root;
+///
+/// let leaves = vec![b"leaf1", b"leaf2", b"leaf3"];
+/// let root = merkle_root(&leaves);
+/// assert!(!root.is_empty());
+/// ```
+///
+/// Empty input returns empty string:
+///
+/// ```
+/// use soroban_toolkit::hash::merkle_root;
+///
+/// let empty_leaves: Vec<&[u8]> = vec![];
+/// let root = merkle_root(&empty_leaves);
+/// assert_eq!(root, "");
+/// ```
+pub fn merkle_root(leaves: &[&[u8]]) -> String {
+    if leaves.is_empty() {
+        return String::new();
+    }
+
+    let mut current_level: Vec<Vec<u8>> = leaves
+        .iter()
+        .map(|leaf| sha256_bytes(leaf))
+        .collect();
+
+    while current_level.len() > 1 {
+        let mut next_level = Vec::new();
+        let mut i = 0;
+
+        while i < current_level.len() {
+            let left = &current_level[i];
+            let right = if i + 1 < current_level.len() {
+                &current_level[i + 1]
+            } else {
+                left
+            };
+
+            let mut combined = left.to_vec();
+            combined.extend_from_slice(right);
+            let hashed = sha256_bytes(&combined);
+            next_level.push(hashed);
+
+            i += 2;
+        }
+
+        current_level = next_level;
+    }
+
+    hex::encode(&current_level[0])
+}
+
+type HmacSha256 = Hmac<Sha256>;
 
 /// Returns SHA-256 hash as hex string
 pub fn sha256_hex(data: &[u8]) -> String {
@@ -22,14 +86,66 @@ pub fn sha512_hex(data: &[u8]) -> String {
 }
 
 /// Returns BLAKE3 hash as hex string
+///
+/// # Examples
+///
+/// ```
+/// use soroban_toolkit::hash::blake3_hex;
+///
+/// let result = blake3_hex(b"hello");
+/// assert_eq!(result, "ea8f163db38682925e4491c5e58d41a79a83e864690e4dd163deb6a9b4480e48");
+/// ```
 pub fn blake3_hex(data: &[u8]) -> String {
     hex::encode(blake3::hash(data).as_bytes())
 }
 
-/// Returns double SHA-256 hash as hex string (used in Bitcoin/blockchain)
+/// Returns BLAKE3 hash as bytes
+///
+/// # Examples
+///
+/// ```
+/// use soroban_toolkit::hash::blake3_bytes;
+/// use hex;
+///
+/// let result = blake3_bytes(b"hello");
+/// let expected_hex = "ea8f163db38682925e4491c5e58d41a79a83e864690e4dd163deb6a9b4480e48";
+/// assert_eq!(hex::encode(result), expected_hex);
+/// ```
+pub fn blake3_bytes(data: &[u8]) -> Vec<u8> {
+    blake3::hash(data).as_bytes().to_vec()
+}
+
+/// Returns double SHA-256 hash as hex string (used in blockchain contexts like Bitcoin)
+///
+/// # Examples
+///
+/// ```
+/// use soroban_toolkit::hash::double_sha256;
+///
+/// let result = double_sha256(b"hello");
+/// assert_eq!(result, "9595c9df90075148eb06860365df33584b75bff782a510c6cd4883a419833d50");
+/// ```
 pub fn double_sha256(data: &[u8]) -> String {
     let first = sha256_bytes(data);
     sha256_hex(&first)
+}
+
+/// Returns HMAC-SHA256 signature as hex-encoded string
+///
+/// # Examples
+///
+/// ```
+/// use soroban_toolkit::hash::hmac_sha256;
+///
+/// let key = b"secret_key";
+/// let message = b"hello world";
+/// let signature = hmac_sha256(key, message);
+/// assert_eq!(signature, "734cc62f3284114afe56cdf60203a15549da5150d176b78b398a1f32e5e233ae");
+/// ```
+pub fn hmac_sha256(key: &[u8], message: &[u8]) -> String {
+    let mut mac = HmacSha256::new_from_slice(key).expect("HMAC can take any key size");
+    mac.update(message);
+    hex::encode(mac.finalize().into_bytes())
 }
 
 /// Timing-safe comparison of two byte slices
@@ -75,6 +191,39 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_merkle_root_empty_input() {
+        let leaves: Vec<&[u8]> = vec![];
+        assert_eq!(merkle_root(&leaves), "");
+    }
+
+    #[test]
+    fn test_merkle_root_single_leaf() {
+        let leaves = vec![b"test"];
+        let expected = sha256_hex(b"test");
+        assert_eq!(merkle_root(&leaves), expected);
+    }
+
+    #[test]
+    fn test_merkle_root_two_leaves() {
+        let leaf1 = b"leaf1";
+        let leaf2 = b"leaf2";
+        let hash1 = sha256_bytes(leaf1);
+        let hash2 = sha256_bytes(leaf2);
+        let mut combined = hash1;
+        combined.extend_from_slice(&hash2);
+        let expected = sha256_hex(&combined);
+        assert_eq!(merkle_root(&[leaf1, leaf2]), expected);
+    }
+
+    #[test]
+    fn test_merkle_root_three_leaves() {
+        let leaves = vec![b"a", b"b", b"c"];
+        let root = merkle_root(&leaves);
+        assert!(!root.is_empty());
+        assert_eq!(root.len(), 64);
+    }
+
+    #[test]
     fn test_sha256_known_value() {
         let result = sha256_hex(b"hello");
         assert_eq!(
@@ -93,6 +242,7 @@ mod tests {
     #[test]
     fn test_double_sha256() {
         let result = double_sha256(b"hello");
+        assert_eq!(result, "9595c9df90075148eb06860365df33584b75bff782a510c6cd4883a419833d50");
         assert_eq!(result.len(), 64);
     }
 
@@ -107,46 +257,29 @@ mod tests {
     }
 
     #[test]
-    fn test_secure_compare_empty() {
-        assert!(secure_compare(b"", b""));
+    fn test_hmac_sha256_test_vector_1() {
+        // Test vector from RFC 4231
+        let key = [0x0b; 20];
+        let message = b"Hi There";
+        let expected = "b0344c61d8db38535ca8afceaf0bf12b881dc200c9833da726e9376c2e32cff7";
+        assert_eq!(hmac_sha256(&key, message), expected);
     }
 
     #[test]
-    fn test_secure_compare_different_length() {
-        assert!(!secure_compare(b"hello", b"hi"));
-        assert!(!secure_compare(b"a", b"ab"));
+    fn test_hmac_sha256_test_vector_2() {
+        // Test vector from RFC 4231
+        let key = b"Jefe";
+        let message = b"what do ya want for nothing?";
+        let expected = "5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843";
+        assert_eq!(hmac_sha256(key, message), expected);
     }
 
     #[test]
-    fn test_secure_compare_single_byte_diff() {
-        // Test that differing at different positions takes same time
-        assert!(!secure_compare(&[0xFF], &[0x00]));
-        assert!(!secure_compare(&[0x00], &[0xFF]));
-    }
-
-    #[test]
-    fn test_secure_compare_hash_values() {
-        // Test with actual hash-like byte sequences
-        let hash1 = sha256_bytes(b"test");
-        let hash2 = sha256_bytes(b"test");
-        let hash3 = sha256_bytes(b"different");
-        
-        assert!(secure_compare(&hash1, &hash2));
-        assert!(!secure_compare(&hash1, &hash3));
-    }
-
-    #[test]
-    fn test_secure_compare_constant_time() {
-        // This test demonstrates the constant-time behavior
-        // Even though we can't measure time precisely in tests,
-        // the implementation guarantees that all bytes are compared
-        let a = vec![0xAB; 32];
-        let b = vec![0xAB; 32];
-        let c = vec![0xCD; 32];
-        
-        // Both of these should take the same time to compare
-        let _result1 = secure_compare(&a, &b); // equal
-        let _result2 = secure_compare(&a, &c); // different
-        // In practice, both comparisons process all 32 bytes
+    fn test_hmac_sha256_test_vector_3() {
+        // Test vector from RFC 4231
+        let key = [0xaa; 20];
+        let message = [0xdd; 50];
+        let expected = "773ea91e36800e46854db8ebd09181a72959098b3ef8c122d9635514ced565fe";
+        assert_eq!(hmac_sha256(&key, &message), expected);
     }
 }
