@@ -149,6 +149,33 @@ pub fn hmac_sha256(key: &[u8], message: &[u8]) -> String {
 }
 
 /// Timing-safe comparison of two byte slices
+///
+/// This function performs a constant-time comparison to prevent timing attacks.
+/// When comparing sensitive data like hashes or cryptographic signatures, a naive
+/// byte-by-byte comparison using `==` can leak information through timing differences:
+/// - Early mismatch exits immediately (fast)
+/// - Full matches require comparing all bytes (slow)
+///
+/// An attacker can measure these timing differences to infer how many bytes match,
+/// potentially recovering the correct value through repeated attacks.
+///
+/// This implementation uses XOR operations and bitwise OR to ensure all bytes are
+/// compared regardless of their values, taking constant time regardless of where
+/// mismatches occur.
+///
+/// # Arguments
+/// * `a` - First byte slice to compare
+/// * `b` - Second byte slice to compare
+///
+/// # Returns
+/// `true` if both slices are equal, `false` otherwise
+///
+/// # Example
+/// ```
+/// let hash1 = [0xab, 0xcd];
+/// let hash2 = [0xab, 0xcd];
+/// assert!(soroban_escrow::hash::secure_compare(&hash1, &hash2));
+/// ```
 pub fn secure_compare(a: &[u8], b: &[u8]) -> bool {
     if a.len() != b.len() {
         return false;
