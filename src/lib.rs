@@ -13,6 +13,7 @@ pub use address::SorobanAddress;
 pub use address::detect_address_type;
 pub use fee::estimate_fee;
 pub use fee::estimate_fee_xlm;
+pub use hash::secure_compare;
 pub use transaction::TimeBounds;
 pub use transaction::is_within_bounds;
 pub use transaction::validate_time_bounds;
