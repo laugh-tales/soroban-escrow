@@ -1607,6 +1607,7 @@ dependencies = [
  "blake3",
  "clap",
  "hex",
+ "hmac",
  "pretty_assertions",
  "serde",
  "serde_json",
