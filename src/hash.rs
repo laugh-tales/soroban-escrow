@@ -22,8 +22,33 @@ pub fn sha512_hex(data: &[u8]) -> String {
 }
 
 /// Returns BLAKE3 hash as hex string
+///
+/// # Examples
+///
+/// ```
+/// use soroban_toolkit::hash::blake3_hex;
+///
+/// let result = blake3_hex(b"hello");
+/// assert_eq!(result, "ea8f163db38682925e4491c5e58d41a79a83e864690e4dd163deb6a9b4480e48");
+/// ```
 pub fn blake3_hex(data: &[u8]) -> String {
     hex::encode(blake3::hash(data).as_bytes())
+}
+
+/// Returns BLAKE3 hash as bytes
+///
+/// # Examples
+///
+/// ```
+/// use soroban_toolkit::hash::blake3_bytes;
+/// use hex;
+///
+/// let result = blake3_bytes(b"hello");
+/// let expected_hex = "ea8f163db38682925e4491c5e58d41a79a83e864690e4dd163deb6a9b4480e48";
+/// assert_eq!(hex::encode(result), expected_hex);
+/// ```
+pub fn blake3_bytes(data: &[u8]) -> Vec<u8> {
+    blake3::hash(data).as_bytes().to_vec()
 }
 
 /// Returns double SHA-256 hash as hex string (used in blockchain contexts like Bitcoin)
@@ -87,5 +112,21 @@ mod tests {
     #[test]
     fn test_secure_compare_not_equal() {
         assert!(!secure_compare(b"hello", b"world"));
+    }
+
+    #[test]
+    fn test_blake3_hex_known_value() {
+        let result = blake3_hex(b"hello");
+        assert_eq!(
+            result,
+            "ea8f163db38682925e4491c5e58d41a79a83e864690e4dd163deb6a9b4480e48"
+        );
+    }
+
+    #[test]
+    fn test_blake3_bytes_known_value() {
+        let result = blake3_bytes(b"hello");
+        let expected_hex = "ea8f163db38682925e4491c5e58d41a79a83e864690e4dd163deb6a9b4480e48";
+        assert_eq!(hex::encode(result), expected_hex);
     }
 }
