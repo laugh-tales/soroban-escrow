@@ -121,10 +121,11 @@ pub fn to_base64_url(bytes: &[u8]) -> String {
 /// ```rust
 /// use soroban_toolkit::encoding::from_base64_url;
 /// let unpadded = "aGVsbG8gd29ybGQ"; // No padding
-/// let with_padding = "aGVsbG8gd29ybGQ="; // With padding
-/// // Both decode successfully
+/// // Unpadded input decodes successfully
 /// assert!(from_base64_url(unpadded).is_ok());
-/// assert!(from_base64_url(with_padding).is_ok());
+/// // Padded input is rejected by this function
+/// let with_padding = "aGVsbG8gd29ybGQ=";
+/// assert!(from_base64_url(with_padding).is_err());
 /// ```
 pub fn from_base64_url(s: &str) -> Result<Vec<u8>, EncodingError> {
     general_purpose::URL_SAFE_NO_PAD

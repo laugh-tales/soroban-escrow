@@ -60,9 +60,10 @@ pub fn is_account_address(address: &str) -> bool {
 }
 
 /// Masks an address showing only first 4 and last 4 characters
-/// 
+///
 /// # Examples
 /// ```
+/// use soroban_toolkit::address::mask_address;
 /// let addr = "GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGZN36UWBE5XFGT35JA5UMG";
 /// assert_eq!(mask_address(addr), "GCEZ...5UMG");
 /// ```
@@ -78,6 +79,7 @@ pub fn mask_address(address: &str) -> String {
 ///
 /// # Examples
 /// ```
+/// use soroban_toolkit::address::mask_middle;
 /// let addr = "GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGZN36UWBE5XFGT35JA5UMG";
 /// assert_eq!(mask_middle(addr, 6), "GCEZWK...JA5UMG");
 /// ```
@@ -187,6 +189,50 @@ pub fn diff_addresses(old: &[&str], new: &[&str]) -> AddressDiff {
     }
 }
 
+/// Returns `true` if `address` is a valid Soroban contract address.
+///
+/// A valid contract address starts with `'C'` and is exactly 56 characters long.
+///
+/// # Examples
+///
+/// ```
+/// use soroban_toolkit::address::is_valid_contract_address;
+///
+/// assert!(is_valid_contract_address("CCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGZN36UWBE5XFGT35JA5UMG"));
+/// assert!(!is_valid_contract_address("GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGZN36UWBE5XFGT35JA5UMG"));
+/// assert!(!is_valid_contract_address("CSHORT"));
+/// ```
+pub fn is_valid_contract_address(address: &str) -> bool {
+    address.starts_with('C') && address.len() == 56
+}
+
+/// Validates that `address` is a well-formed Soroban contract address.
+///
+/// Returns `Ok(())` when the address starts with `'C'` and is exactly 56 characters
+/// long. Otherwise returns the appropriate [`AddressError`] variant.
+///
+/// # Examples
+///
+/// ```
+/// use soroban_toolkit::address::{validate_contract_address, AddressError};
+///
+/// assert!(validate_contract_address("CCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGZN36UWBE5XFGT35JA5UMG").is_ok());
+/// assert_eq!(validate_contract_address("CSHORT"), Err(AddressError::InvalidLength));
+/// assert_eq!(
+///     validate_contract_address("GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGZN36UWBE5XFGT35JA5UMG"),
+///     Err(AddressError::InvalidPrefix),
+/// );
+/// ```
+pub fn validate_contract_address(address: &str) -> Result<(), AddressError> {
+    if !address.starts_with('C') {
+        return Err(AddressError::InvalidPrefix);
+    }
+    if address.len() != 56 {
+        return Err(AddressError::InvalidLength);
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -242,4 +288,68 @@ mod tests {
 
     // Property‑based tests omitted because the `proptest` crate cannot be compiled without the MSVC linker.
     // The tests are retained in the repository history for future use.
+
+    // --- is_valid_contract_address ---
+
+    #[test]
+    fn test_is_valid_contract_address_valid() {
+        assert!(is_valid_contract_address(VALID_CONTRACT));
+    }
+
+    #[test]
+    fn test_is_valid_contract_address_rejects_account_prefix() {
+        assert!(!is_valid_contract_address(VALID_ACCOUNT));
+    }
+
+    #[test]
+    fn test_is_valid_contract_address_rejects_short() {
+        assert!(!is_valid_contract_address("CSHORT"));
+    }
+
+    #[test]
+    fn test_is_valid_contract_address_rejects_wrong_prefix() {
+        assert!(!is_valid_contract_address(
+            "XCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGZN36UWBE5XFGT35JA5UMG"
+        ));
+    }
+
+    // --- validate_contract_address ---
+
+    #[test]
+    fn test_validate_contract_address_valid() {
+        assert_eq!(validate_contract_address(VALID_CONTRACT), Ok(()));
+    }
+
+    #[test]
+    fn test_validate_contract_address_invalid_prefix() {
+        assert_eq!(
+            validate_contract_address(VALID_ACCOUNT),
+            Err(AddressError::InvalidPrefix)
+        );
+    }
+
+    #[test]
+    fn test_validate_contract_address_invalid_length_short() {
+        assert_eq!(
+            validate_contract_address("CSHORT"),
+            Err(AddressError::InvalidLength)
+        );
+    }
+
+    #[test]
+    fn test_validate_contract_address_invalid_length_long() {
+        let too_long = format!("C{}", "A".repeat(56));
+        assert_eq!(
+            validate_contract_address(&too_long),
+            Err(AddressError::InvalidLength)
+        );
+    }
+
+    #[test]
+    fn test_validate_contract_address_empty() {
+        assert_eq!(
+            validate_contract_address(""),
+            Err(AddressError::InvalidPrefix)
+        );
+    }
 }

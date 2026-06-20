@@ -13,7 +13,10 @@ impl std::fmt::Display for TxError {
             TxError::InvalidHash => write!(f, "Invalid transaction hash"),
             TxError::InvalidFee => write!(f, "Invalid fee"),
             TxError::InvalidSequence => write!(f, "Invalid sequence number"),
-            TxError::InvalidTimeBounds => write!(f, "Invalid time bounds: max_time must be 0 or greater than min_time"),
+            TxError::InvalidTimeBounds => write!(
+                f,
+                "Invalid time bounds: max_time must be 0 or greater than min_time"
+            ),
             TxError::InvalidAssetCode => write!(f, "Invalid asset code"),
         }
     }
@@ -210,74 +213,110 @@ mod tests {
 
     #[test]
     fn test_validate_time_bounds_valid() {
-        let bounds = TimeBounds { min_time: 1_000, max_time: 2_000 };
+        let bounds = TimeBounds {
+            min_time: 1_000,
+            max_time: 2_000,
+        };
         assert!(validate_time_bounds(&bounds).is_ok());
     }
 
     #[test]
     fn test_validate_time_bounds_max_less_than_min() {
-        let bounds = TimeBounds { min_time: 2_000, max_time: 1_000 };
+        let bounds = TimeBounds {
+            min_time: 2_000,
+            max_time: 1_000,
+        };
         assert!(validate_time_bounds(&bounds).is_err());
     }
 
     #[test]
     fn test_validate_time_bounds_max_equal_to_min() {
-        let bounds = TimeBounds { min_time: 1_000, max_time: 1_000 };
+        let bounds = TimeBounds {
+            min_time: 1_000,
+            max_time: 1_000,
+        };
         assert!(validate_time_bounds(&bounds).is_err());
     }
 
     #[test]
     fn test_validate_time_bounds_zero_max_time() {
         // max_time == 0 means no expiry — always valid regardless of min_time
-        let bounds = TimeBounds { min_time: 1_000, max_time: 0 };
+        let bounds = TimeBounds {
+            min_time: 1_000,
+            max_time: 0,
+        };
         assert!(validate_time_bounds(&bounds).is_ok());
     }
 
     #[test]
     fn test_validate_time_bounds_both_zero() {
-        let bounds = TimeBounds { min_time: 0, max_time: 0 };
+        let bounds = TimeBounds {
+            min_time: 0,
+            max_time: 0,
+        };
         assert!(validate_time_bounds(&bounds).is_ok());
     }
 
     #[test]
     fn test_is_within_bounds_inside_range() {
-        let bounds = TimeBounds { min_time: 1_000, max_time: 2_000 };
+        let bounds = TimeBounds {
+            min_time: 1_000,
+            max_time: 2_000,
+        };
         assert!(is_within_bounds(&bounds, 1_500));
     }
 
     #[test]
     fn test_is_within_bounds_before_min() {
-        let bounds = TimeBounds { min_time: 1_000, max_time: 2_000 };
+        let bounds = TimeBounds {
+            min_time: 1_000,
+            max_time: 2_000,
+        };
         assert!(!is_within_bounds(&bounds, 500));
     }
 
     #[test]
     fn test_is_within_bounds_after_max() {
-        let bounds = TimeBounds { min_time: 1_000, max_time: 2_000 };
+        let bounds = TimeBounds {
+            min_time: 1_000,
+            max_time: 2_000,
+        };
         assert!(!is_within_bounds(&bounds, 2_500));
     }
 
     #[test]
     fn test_is_within_bounds_at_min_boundary() {
-        let bounds = TimeBounds { min_time: 1_000, max_time: 2_000 };
+        let bounds = TimeBounds {
+            min_time: 1_000,
+            max_time: 2_000,
+        };
         assert!(is_within_bounds(&bounds, 1_000));
     }
 
     #[test]
     fn test_is_within_bounds_at_max_boundary() {
-        let bounds = TimeBounds { min_time: 1_000, max_time: 2_000 };
+        let bounds = TimeBounds {
+            min_time: 1_000,
+            max_time: 2_000,
+        };
         assert!(is_within_bounds(&bounds, 2_000));
     }
 
     #[test]
     fn test_is_within_bounds_no_expiry() {
-        let bounds = TimeBounds { min_time: 1_000, max_time: 0 };
+        let bounds = TimeBounds {
+            min_time: 1_000,
+            max_time: 0,
+        };
         assert!(is_within_bounds(&bounds, 99_999_999));
     }
 
     #[test]
     fn test_is_within_bounds_zero_min_time() {
-        let bounds = TimeBounds { min_time: 0, max_time: 2_000 };
+        let bounds = TimeBounds {
+            min_time: 0,
+            max_time: 2_000,
+        };
         assert!(is_within_bounds(&bounds, 0));
         assert!(is_within_bounds(&bounds, 1_000));
         assert!(!is_within_bounds(&bounds, 2_001));
@@ -285,7 +324,10 @@ mod tests {
 
     #[test]
     fn test_time_bounds_error_message() {
-        let bounds = TimeBounds { min_time: 5_000, max_time: 1_000 };
+        let bounds = TimeBounds {
+            min_time: 5_000,
+            max_time: 1_000,
+        };
         let err = validate_time_bounds(&bounds).unwrap_err();
         assert!(err.to_string().contains("max_time"));
     }
