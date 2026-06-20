@@ -7,13 +7,15 @@ pub mod hash;
 pub mod memo;
 pub mod transaction;
 
+pub use address::detect_address_type;
+pub use address::is_valid_contract_address;
+pub use address::validate_contract_address;
 pub use address::AddressDiff;
 pub use address::AddressType;
 pub use address::SorobanAddress;
-pub use address::detect_address_type;
 pub use fee::estimate_fee;
 pub use fee::estimate_fee_xlm;
 pub use hash::secure_compare;
-pub use transaction::TimeBounds;
 pub use transaction::is_within_bounds;
 pub use transaction::validate_time_bounds;
+pub use transaction::TimeBounds;

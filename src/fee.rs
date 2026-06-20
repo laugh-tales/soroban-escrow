@@ -49,7 +49,7 @@ pub fn estimate_fee(base_fee: u32, operation_count: u32) -> u32 {
 /// ```
 pub fn estimate_fee_xlm(base_fee: u32, operation_count: u32) -> f64 {
     let fee_stroops = estimate_fee(base_fee, operation_count);
-    fee_stroops as f64 * 0.0000001
+    fee_stroops as f64 / 10_000_000.0
 }
 
 #[cfg(test)]

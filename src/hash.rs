@@ -12,7 +12,7 @@ use sha2::{Digest, Sha256, Sha512};
 /// ```
 /// use soroban_toolkit::hash::merkle_root;
 ///
-/// let leaves = vec![b"leaf1", b"leaf2", b"leaf3"];
+/// let leaves: Vec<&[u8]> = vec![b"leaf1", b"leaf2", b"leaf3"];
 /// let root = merkle_root(&leaves);
 /// assert!(!root.is_empty());
 /// ```
@@ -31,10 +31,7 @@ pub fn merkle_root(leaves: &[&[u8]]) -> String {
         return String::new();
     }
 
-    let mut current_level: Vec<Vec<u8>> = leaves
-        .iter()
-        .map(|leaf| sha256_bytes(leaf))
-        .collect();
+    let mut current_level: Vec<Vec<u8>> = leaves.iter().map(|leaf| sha256_bytes(leaf)).collect();
 
     while current_level.len() > 1 {
         let mut next_level = Vec::new();
@@ -93,7 +90,7 @@ pub fn sha512_hex(data: &[u8]) -> String {
 /// use soroban_toolkit::hash::blake3_hex;
 ///
 /// let result = blake3_hex(b"hello");
-/// assert_eq!(result, "ea8f163db38682925e4491c5e58d41a79a83e864690e4dd163deb6a9b4480e48");
+/// assert_eq!(result, "ea8f163db38682925e4491c5e58d4bb3506ef8c14eb78a86e908c5624a67200f");
 /// ```
 pub fn blake3_hex(data: &[u8]) -> String {
     hex::encode(blake3::hash(data).as_bytes())
@@ -108,7 +105,7 @@ pub fn blake3_hex(data: &[u8]) -> String {
 /// use hex;
 ///
 /// let result = blake3_bytes(b"hello");
-/// let expected_hex = "ea8f163db38682925e4491c5e58d41a79a83e864690e4dd163deb6a9b4480e48";
+/// let expected_hex = "ea8f163db38682925e4491c5e58d4bb3506ef8c14eb78a86e908c5624a67200f";
 /// assert_eq!(hex::encode(result), expected_hex);
 /// ```
 pub fn blake3_bytes(data: &[u8]) -> Vec<u8> {
@@ -140,7 +137,7 @@ pub fn double_sha256(data: &[u8]) -> String {
 /// let key = b"secret_key";
 /// let message = b"hello world";
 /// let signature = hmac_sha256(key, message);
-/// assert_eq!(signature, "734cc62f3284114afe56cdf60203a15549da5150d176b78b398a1f32e5e233ae");
+/// assert_eq!(signature, "cf1a418afaafc798df48fd804a2abf6970283afd8c40b41f818ad9b6ca4f8ca8");
 /// ```
 pub fn hmac_sha256(key: &[u8], message: &[u8]) -> String {
     let mut mac = HmacSha256::new_from_slice(key).expect("HMAC can take any key size");
@@ -172,9 +169,10 @@ pub fn hmac_sha256(key: &[u8], message: &[u8]) -> String {
 ///
 /// # Example
 /// ```
+/// use soroban_toolkit::hash::secure_compare;
 /// let hash1 = [0xab, 0xcd];
 /// let hash2 = [0xab, 0xcd];
-/// assert!(soroban_escrow::hash::secure_compare(&hash1, &hash2));
+/// assert!(secure_compare(&hash1, &hash2));
 /// ```
 pub fn secure_compare(a: &[u8], b: &[u8]) -> bool {
     if a.len() != b.len() {
@@ -198,7 +196,7 @@ mod tests {
 
     #[test]
     fn test_merkle_root_single_leaf() {
-        let leaves = vec![b"test"];
+        let leaves: Vec<&[u8]> = vec![b"test"];
         let expected = sha256_hex(b"test");
         assert_eq!(merkle_root(&leaves), expected);
     }
@@ -217,7 +215,7 @@ mod tests {
 
     #[test]
     fn test_merkle_root_three_leaves() {
-        let leaves = vec![b"a", b"b", b"c"];
+        let leaves: Vec<&[u8]> = vec![b"a", b"b", b"c"];
         let root = merkle_root(&leaves);
         assert!(!root.is_empty());
         assert_eq!(root.len(), 64);
@@ -242,7 +240,10 @@ mod tests {
     #[test]
     fn test_double_sha256() {
         let result = double_sha256(b"hello");
-        assert_eq!(result, "9595c9df90075148eb06860365df33584b75bff782a510c6cd4883a419833d50");
+        assert_eq!(
+            result,
+            "9595c9df90075148eb06860365df33584b75bff782a510c6cd4883a419833d50"
+        );
         assert_eq!(result.len(), 64);
     }
 
