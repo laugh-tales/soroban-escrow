@@ -61,14 +61,55 @@ pub fn merkle_root(leaves: &[&[u8]]) -> String {
 
 type HmacSha256 = Hmac<Sha256>;
 
-/// Returns SHA-256 hash as hex string
+/// Returns the lowercase hexadecimal string representation of the SHA-256 hash of the input data.
+///
+/// # Arguments
+///
+/// * `data` - A byte slice containing the data to hash.
+///
+/// # Examples
+///
+/// ```
+/// use soroban_toolkit::hash::sha256_hex;
+///
+/// let result = sha256_hex(b"hello");
+/// assert_eq!(result, "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824");
+///
+/// let empty_result = sha256_hex(b"");
+/// assert_eq!(empty_result, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
+/// ```
 pub fn sha256_hex(data: &[u8]) -> String {
     let mut hasher = Sha256::new();
     hasher.update(data);
     hex::encode(hasher.finalize())
 }
 
-/// Returns SHA-256 hash as bytes
+/// Returns the raw SHA-256 hash bytes of the input data.
+///
+/// # Arguments
+///
+/// * `data` - A byte slice containing the data to hash.
+///
+/// # Examples
+///
+/// ```
+/// use soroban_toolkit::hash::sha256_bytes;
+///
+/// let result = sha256_bytes(b"hello");
+/// assert_eq!(result.len(), 32);
+///
+/// // Known SHA-256 bytes for empty string
+/// let empty_result = sha256_bytes(b"");
+/// assert_eq!(
+///     empty_result,
+///     vec![
+///         0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14,
+///         0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f, 0xb9, 0x24,
+///         0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c,
+///         0xa4, 0x95, 0x99, 0x1b, 0x78, 0x52, 0xb8, 0x55
+///     ]
+/// );
+/// ```
 pub fn sha256_bytes(data: &[u8]) -> Vec<u8> {
     let mut hasher = Sha256::new();
     hasher.update(data);
@@ -228,6 +269,39 @@ mod tests {
             result,
             "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
         );
+    }
+
+    #[test]
+    fn test_sha256_hex_empty() {
+        let result = sha256_hex(b"");
+        assert_eq!(
+            result,
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        );
+    }
+
+    #[test]
+    fn test_sha256_bytes_empty() {
+        let result = sha256_bytes(b"");
+        let expected = vec![
+            0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14,
+            0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f, 0xb9, 0x24,
+            0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c,
+            0xa4, 0x95, 0x99, 0x1b, 0x78, 0x52, 0xb8, 0x55
+        ];
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_sha256_bytes_known_value() {
+        let result = sha256_bytes(b"hello");
+        let expected = vec![
+            0x2c, 0xf2, 0x4d, 0xba, 0x5f, 0xb0, 0xa3, 0x0e,
+            0x26, 0xe8, 0x3b, 0x2a, 0xc5, 0xb9, 0xe2, 0x9e,
+            0x1b, 0x16, 0x1e, 0x5c, 0x1f, 0xa7, 0x42, 0x5e,
+            0x73, 0x04, 0x33, 0x62, 0x93, 0x8b, 0x98, 0x24
+        ];
+        assert_eq!(result, expected);
     }
 
     #[test]
