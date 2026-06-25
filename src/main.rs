@@ -446,12 +446,7 @@ fn main() {
         Commands::Xlm { action } => match action {
             XlmCommands::ToXlm { stroops } => {
                 let xlm = stroops_to_xlm(stroops);
-                let out = if xlm.fract() == 0.0 {
-                    format!("{}", xlm as u64)
-                } else {
-                    format!("{xlm}")
-                };
-                println!("{out}");
+                println!("{}", xlm);
             }
             XlmCommands::ToStroops { xlm } => {
                 println!("{}", xlm_to_stroops(xlm));

@@ -57,6 +57,6 @@ fn validated_address_can_drive_encoded_transaction_metadata_flow() {
 
     assert_eq!(normalized_hash, digest);
     assert_eq!(decoded_hash, normalized_hash.as_bytes());
-    assert_eq!(estimate_fee(100, 3), 300);
-    assert_eq!(format_xlm(300), "0.0000300 XLM");
+    assert_eq!(estimate_fee(100, 3), 400);
+    assert_eq!(format_xlm(400), "0.0000400 XLM");
 }

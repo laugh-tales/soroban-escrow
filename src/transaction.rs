@@ -154,7 +154,7 @@ pub fn normalize_tx_hash(hash: &str) -> Result<String, TxError> {
 
 /// Estimates transaction fee in stroops
 pub fn estimate_fee(base_fee: u32, operation_count: u32) -> u32 {
-    base_fee * operation_count
+    base_fee.saturating_mul(operation_count)
 }
 
 /// Estimates transaction fee in XLM
@@ -209,6 +209,11 @@ mod tests {
     #[test]
     fn test_estimate_fee() {
         assert_eq!(estimate_fee(100, 3), 300);
+    }
+
+    #[test]
+    fn test_estimate_fee_saturates_on_overflow() {
+        assert_eq!(estimate_fee(u32::MAX, u32::MAX), u32::MAX);
     }
 
     #[test]
