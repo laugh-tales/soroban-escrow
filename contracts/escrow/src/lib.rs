@@ -287,6 +287,33 @@ impl EscrowContract {
             .publish((Symbol::new(&env, "escrow_disputed"),), (escrow_id,));
     }
 
+    /// Transfer beneficiary — depositor only, escrow must be Active.
+    #[allow(deprecated)]
+    pub fn transfer_beneficiary(env: Env, escrow_id: u64, new_beneficiary: Address) {
+        let mut escrow: Escrow = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Escrow(escrow_id))
+            .expect("Escrow not found");
+
+        escrow.depositor.require_auth();
+        assert!(
+            escrow.status == EscrowStatus::Active,
+            "Escrow is not active"
+        );
+
+        escrow.beneficiary = new_beneficiary.clone();
+        env.storage()
+            .persistent()
+            .set(&DataKey::Escrow(escrow_id), &escrow);
+
+        #[allow(deprecated)]
+        env.events().publish(
+            (Symbol::new(&env, "beneficiary_transferred"),),
+            (escrow_id, new_beneficiary),
+        );
+    }
+
     /// Get escrow details.
     pub fn get_escrow(env: Env, escrow_id: u64) -> Escrow {
         env.storage()
@@ -713,5 +740,72 @@ mod tests {
             &depositor, &beneficiary, &token, &10, &0u64,
             &id_b, &EscrowStatus::Released,
         );
+    }
+
+    // ── Transfer beneficiary tests ────────────────────────────────────────────
+
+    #[test]
+    fn test_transfer_beneficiary_success() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let (admin, depositor, beneficiary, token, contract_id) = setup(&env);
+        let client = EscrowContractClient::new(&env, &contract_id);
+        client.initialize(&admin);
+
+        let escrow_id = client.create_escrow(&depositor, &beneficiary, &token, &100, &0u64);
+        let new_beneficiary = Address::generate(&env);
+
+        client.transfer_beneficiary(&escrow_id, &new_beneficiary);
+
+        let escrow = client.get_escrow(&escrow_id);
+        assert_eq!(escrow.beneficiary, new_beneficiary);
+        assert_eq!(escrow.status, EscrowStatus::Active);
+    }
+
+    #[test]
+    fn test_transfer_beneficiary_non_depositor() {
+        let env = Env::default();
+        let depositor = Address::generate(&env);
+        let contract_id = env.register(EscrowContract, ());
+        let client = EscrowContractClient::new(&env, &contract_id);
+
+        // Inject escrow directly into storage (bypass contract calls that need auth)
+        let escrow_id = 1u64;
+        let escrow = Escrow {
+            depositor: depositor.clone(),
+            beneficiary: Address::generate(&env),
+            token: Address::generate(&env),
+            amount: 100,
+            status: EscrowStatus::Active,
+            release_time: 0,
+            parent_escrow_id: 0,
+            required_parent_status: ParentStatusRequirement::None,
+        };
+        env.as_contract(&contract_id, || {
+            env.storage()
+                .persistent()
+                .set(&DataKey::Escrow(escrow_id), &escrow);
+        });
+
+        // Call with a non-depositor without mock_all_auths — should fail auth
+        let new_beneficiary = Address::generate(&env);
+        let result = client.try_transfer_beneficiary(&escrow_id, &new_beneficiary);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_transfer_beneficiary_non_active() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let (admin, depositor, beneficiary, token, contract_id) = setup(&env);
+        let client = EscrowContractClient::new(&env, &contract_id);
+        client.initialize(&admin);
+
+        let escrow_id = client.create_escrow(&depositor, &beneficiary, &token, &100, &0u64);
+        client.release(&escrow_id);
+
+        let new_beneficiary = Address::generate(&env);
+        let result = client.try_transfer_beneficiary(&escrow_id, &new_beneficiary);
+        assert!(result.is_err());
     }
 }
