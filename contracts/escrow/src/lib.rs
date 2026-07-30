@@ -33,7 +33,8 @@ pub enum ParentStatusRequirement {
 #[derive(Clone, Debug)]
 pub struct Escrow {
     pub depositor: Address,
-    pub beneficiary: Address,
+    pub beneficiaries: Vec<Address>,
+    pub shares: Vec<u32>,
     pub token: Address,
     pub amount: i128,
     pub released_amount: i128,
@@ -121,13 +122,15 @@ impl EscrowContract {
     pub fn create_escrow(
         env: Env,
         depositor: Address,
-        beneficiary: Address,
+        beneficiaries: Vec<Address>,
+        shares: Vec<u32>,
         token: Address,
         amount: i128,
         release_time: u64,
     ) -> u64 {
         depositor.require_auth();
         assert!(amount > 0, "Amount must be greater than zero");
+        Self::validate_beneficiaries(&beneficiaries, &shares);
 
         let token_client = token::Client::new(&env, &token);
         token_client.transfer(&depositor, &env.current_contract_address(), &amount);
@@ -136,7 +139,8 @@ impl EscrowContract {
 
         let escrow = Escrow {
             depositor,
-            beneficiary,
+            beneficiaries,
+            shares,
             token,
             amount,
             released_amount: 0,
@@ -189,7 +193,8 @@ impl EscrowContract {
     pub fn create_child_escrow(
         env: Env,
         depositor: Address,
-        beneficiary: Address,
+        beneficiaries: Vec<Address>,
+        shares: Vec<u32>,
         token: Address,
         amount: i128,
         release_time: u64,
@@ -198,6 +203,7 @@ impl EscrowContract {
     ) -> u64 {
         depositor.require_auth();
         assert!(amount > 0, "Amount must be greater than zero");
+        Self::validate_beneficiaries(&beneficiaries, &shares);
 
         // Validate parent exists
         let _parent: Escrow = env
@@ -221,7 +227,8 @@ impl EscrowContract {
 
         let escrow = Escrow {
             depositor,
-            beneficiary,
+            beneficiaries,
+            shares,
             token,
             amount,
             released_amount: 0,
@@ -310,11 +317,7 @@ impl EscrowContract {
         }
 
         let token_client = token::Client::new(&env, &escrow.token);
-        token_client.transfer(
-            &env.current_contract_address(),
-            &escrow.beneficiary,
-            &escrow.amount,
-        );
+        Self::distribute_funds(&env, &token_client, &escrow.amount, &escrow.beneficiaries, &escrow.shares);
 
         escrow.status = EscrowStatus::Released;
         env.storage()
@@ -404,14 +407,18 @@ impl EscrowContract {
     /// * Panics if escrow not found
     /// * Panics if escrow status is not `Active`
     #[allow(deprecated)]
-    pub fn dispute(env: Env, escrow_id: u64) {
+    pub fn dispute(env: Env, escrow_id: u64, beneficiary: Address) {
         let mut escrow: Escrow = env
             .storage()
             .persistent()
             .get(&DataKey::Escrow(escrow_id))
             .expect("Escrow not found");
 
-        escrow.beneficiary.require_auth();
+        beneficiary.require_auth();
+        assert!(
+            escrow.beneficiaries.contains(&beneficiary),
+            "Not a beneficiary"
+        );
         assert!(
             escrow.status == EscrowStatus::Active,
             "Escrow is not active"
@@ -616,11 +623,7 @@ impl EscrowContract {
 
             // All conditions met — release the child automatically.
             let token_client = token::Client::new(&env, &child.token);
-            token_client.transfer(
-                &env.current_contract_address(),
-                &child.beneficiary,
-                &child.amount,
-            );
+            Self::distribute_funds(&env, &token_client, &child.amount, &child.beneficiaries, &child.shares);
 
             child.status = EscrowStatus::Released;
             env.storage()
@@ -637,6 +640,53 @@ impl EscrowContract {
     }
 
     // ── Private helpers ──────────────────────────────────────────────────────
+
+    /// Validate that beneficiaries and shares are consistent:
+    /// - Same length
+    /// - At least one beneficiary
+    /// - All shares > 0
+    /// - Shares sum to 10000 (100% in basis points)
+    fn validate_beneficiaries(beneficiaries: &Vec<Address>, shares: &Vec<u32>) {
+        let len = beneficiaries.len();
+        assert!(len > 0, "At least one beneficiary required");
+        assert_eq!(
+            len,
+            shares.len(),
+            "Beneficiaries and shares length mismatch"
+        );
+        let mut sum: u32 = 0;
+        for i in 0..len {
+            let share = shares.get(i).unwrap();
+            assert!(share > 0, "Each share must be greater than zero");
+            sum += share;
+        }
+        assert_eq!(sum, 10000, "Shares must sum to 10000 (100% in basis points)");
+    }
+
+    /// Distribute `amount` proportionally among `beneficiaries` according to
+    /// their `shares` (basis points). The last beneficiary receives any
+    /// remainder to avoid rounding dust.
+    fn distribute_funds(
+        env: &Env,
+        token_client: &token::Client,
+        amount: &i128,
+        beneficiaries: &Vec<Address>,
+        shares: &Vec<u32>,
+    ) {
+        let len = beneficiaries.len();
+        let mut distributed: i128 = 0;
+        for i in 0..len {
+            let beneficiary = beneficiaries.get(i).unwrap();
+            let share = shares.get(i).unwrap();
+            let transfer_amount = if i == len - 1 {
+                *amount - distributed
+            } else {
+                *amount * (share as i128) / 10000
+            };
+            token_client.transfer(&env.current_contract_address(), &beneficiary, &transfer_amount);
+            distributed += transfer_amount;
+        }
+    }
 
     /// Allocate and return the next escrow ID, incrementing EscrowCount.
     fn next_id(env: &Env) -> u64 {
@@ -1105,10 +1155,13 @@ mod tests {
         let client = EscrowContractClient::new(&env, &contract_id);
         client.initialize(&admin);
 
-        let parent_id = client.create_escrow(&depositor, &beneficiary, &token, &100, &0u64);
+        let beneficiaries = single_beneficiary_vec(&env, &beneficiary);
+        let shares = vec![&env, 10000u32];
+        let parent_id = client.create_escrow(&depositor, &beneficiaries, &shares, &token, &100, &0u64);
         let child_id = client.create_child_escrow(
             &depositor,
-            &beneficiary,
+            &beneficiaries,
+            &shares,
             &token,
             &50,
             &0u64,
@@ -1133,10 +1186,13 @@ mod tests {
         let client = EscrowContractClient::new(&env, &contract_id);
         client.initialize(&admin);
 
-        let parent_id = client.create_escrow(&depositor, &beneficiary, &token, &100, &0u64);
+        let beneficiaries = single_beneficiary_vec(&env, &beneficiary);
+        let shares = vec![&env, 10000u32];
+        let parent_id = client.create_escrow(&depositor, &beneficiaries, &shares, &token, &100, &0u64);
         let child_id = client.create_child_escrow(
             &depositor,
-            &beneficiary,
+            &beneficiaries,
+            &shares,
             &token,
             &50,
             &0u64,
@@ -1164,12 +1220,15 @@ mod tests {
         let client = EscrowContractClient::new(&env, &contract_id);
         client.initialize(&admin);
 
-        let parent_id = client.create_escrow(&depositor, &beneficiary, &token, &100, &0u64);
+        let beneficiaries = single_beneficiary_vec(&env, &beneficiary);
+        let shares = vec![&env, 10000u32];
+        let parent_id = client.create_escrow(&depositor, &beneficiaries, &shares, &token, &100, &0u64);
         // Child has release_time in the future so trigger_children won't auto-fire it.
         env.ledger().set_timestamp(500);
         let child_id = client.create_child_escrow(
             &depositor,
-            &beneficiary,
+            &beneficiaries,
+            &shares,
             &token,
             &50,
             &1000u64, // release_time = 1000
@@ -1196,7 +1255,9 @@ mod tests {
         let client = EscrowContractClient::new(&env, &contract_id);
         client.initialize(&admin);
 
-        let parent_id = client.create_escrow(&depositor, &beneficiary, &token, &100, &0u64);
+        let beneficiaries = single_beneficiary_vec(&env, &beneficiary);
+        let shares = vec![&env, 10000u32];
+        let parent_id = client.create_escrow(&depositor, &beneficiaries, &shares, &token, &100, &0u64);
         let child1 = client.create_child_escrow(
             &depositor,
             &beneficiary,
@@ -1375,8 +1436,11 @@ mod tests {
         let client = EscrowContractClient::new(&env, &contract_id);
         client.initialize(&admin);
 
+        let beneficiaries = single_beneficiary_vec(&env, &beneficiary);
+        let shares = vec![&env, 10000u32];
+
         // Build chain A(1) ← B(2)
-        let id_a = client.create_escrow(&depositor, &beneficiary, &token, &100, &0u64); // 1
+        let id_a = client.create_escrow(&depositor, &beneficiaries, &shares, &token, &100, &0u64); // 1
         let id_b = client.create_child_escrow(
             &depositor,
             &beneficiary,
